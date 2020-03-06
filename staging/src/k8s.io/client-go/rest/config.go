@@ -38,6 +38,9 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
+
+	"go.opencensus.io/plugin/ochttp"
+	"go.opencensus.io/trace"
 )
 
 const (
@@ -295,6 +298,11 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	transport, err := TransportFor(config)
 	if err != nil {
 		return nil, err
+	}
+
+	transport = &ochttp.Transport{
+		Base: transport,
+		StartOptions: trace.StartOptions{Sampler: trace.ProbabilitySampler(0)},
 	}
 
 	var httpClient *http.Client

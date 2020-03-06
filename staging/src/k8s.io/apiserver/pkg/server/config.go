@@ -649,6 +649,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
+	handler = genericapifilers.WithTracing(handler)
 	return handler
 }
 
