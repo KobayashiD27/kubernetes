@@ -1,27 +1,20 @@
 package filters
 
-
-
-
-
 import (
 	"net/http"
-
 	"k8s.io/klog"
-
-	"go.opencensus.io/plugin/ochttp"
-	"go.opencensus.io/trace"
 )
 
-// WithTracing adds tracing to requests if the incoming request is sampled
+type contextKey struct{}
+
+// WithTracing adds tracing to log if the incoming request is sampled
 func WithTracing(handler http.Handler) http.Handler {
-	handler = &ochttp.Handler{
-		Handler: handler,
-		StartOptions: trace.StartOptions{Sampler: trace.ProbabilitySampler(0)},
-	}
-	return http.HandleFunc(func(w http.ResponseWriter, req *http.Request){
-		klog.V(3).Infof("otel test req:%s", req)
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request){
+		hd := req.Header
+		if(hd.Get("X-B3-Sampled") == "1"){
+			klog.V(3).Infof("http tracing demo Sampled:%s, TraceID:%s, SpanID:%s", hd.Get("X-B3-Sampled"), hd.Get("X-B3-TraceID"), hd.Get("X-B3-SpanID"))
+		}
 		handler.ServeHTTP(w, req)
 	})
+} 
 
-}
