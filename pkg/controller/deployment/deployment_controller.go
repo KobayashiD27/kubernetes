@@ -49,6 +49,7 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/util/httptrace"
 )
 
 const (
@@ -592,11 +593,19 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	// TODO: Deep-copy only when needed.
 	d := deployment.DeepCopy()
 
+	// trace test
+	//ctx, span := httptrace.StartSpanFromObject(context.Background(), d, "deployment-controller:syncDeployment")
+	ctx := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
+	ctx, span := httptrace.StartSpan(ctx)
+	defer span.End()
+
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
 		if d.Status.ObservedGeneration < d.Generation {
 			d.Status.ObservedGeneration = d.Generation
+			mfs := httptrace.UpdateTidList(d, span)
+			d.SetManagedFields(mfs)
 			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
 		}
 		return nil

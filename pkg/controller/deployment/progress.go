@@ -28,6 +28,8 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+
+	"k8s.io/kubernetes/pkg/util/httptrace"
 )
 
 // syncRolloutStatus updates the status of a deployment during a rollout. There are
@@ -37,6 +39,9 @@ import (
 func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
 	newStatus := calculateStatus(allRSs, newRS, d)
 
+	ctx := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
+	ctx, span := httptrace.StartSpan(ctx)
+	defer span.End()
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.
 	if !util.HasProgressDeadline(d) {
 		util.RemoveDeploymentCondition(&newStatus, apps.DeploymentProgressing)
@@ -112,6 +117,8 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 		return nil
 	}
 
+	mfs := httptrace.UpdateTidList(d, span)
+	d.SetManagedFields(mfs)
 	newDeployment := d
 	newDeployment.Status = newStatus
 	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(context.TODO(), newDeployment, metav1.UpdateOptions{})
