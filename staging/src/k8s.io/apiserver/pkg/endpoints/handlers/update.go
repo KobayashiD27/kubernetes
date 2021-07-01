@@ -141,8 +141,26 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 					xobj, _ := meta.Accessor(newObj)
 					spanContextString := fmt.Sprintf("%s-%s-%d", spanContext.TraceID, spanContext.SpanID, xobj.GetGeneration())
 					traceManager := spanContextString + "-" + managerOrUserAgent(options.FieldManager, req.UserAgent())
-					klog.V(3).Infof("read TraceContext: %s, traceManger: %s", spanContextString, traceManager)
-					return scope.FieldManager.UpdateNoErrors(liveObj, newObj, traceManager), nil
+					klog.V(2).Infof("read TraceContext: %s, traceManger: %s", spanContextString, traceManager)
+
+					//return scope.FieldManager.UpdateNoErrors(liveObj, newObj, traceManager), nil
+
+					// test mf update
+
+					tidlr := map[string]string{}
+					for _, mf := range xobj.GetManagedFields() {
+						tidlr[mf.TraceContext] = mf.TraceContextProcess
+					}
+
+					newObj = scope.FieldManager.UpdateNoErrors(liveObj, newObj, traceManager)
+
+					xobj, _ = meta.Accessor(newObj)
+					mfs := xobj.GetManagedFields()
+					for i, mf := range mfs {
+						mf.TraceContextProcess = tidlr[mf.TraceContext]
+						mfs[i] = mf
+					}
+					xobj.SetManagedFields(mfs)
 				}
 				return newObj, nil
 			})

@@ -170,9 +170,27 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				spanContextString := fmt.Sprintf("%s-%s-%d", spanContext.TraceID, spanContext.SpanID, xobj.GetGeneration())
 				klog.V(3).Infof("createHndler read TraceContext: %s", spanContextString)
 				traceManager := spanContextString + "-" + managerOrUserAgent(options.FieldManager, req.UserAgent())
-				klog.DumpStack("Dump Create manager:")
-				klog.V(2).Infof("Create manager: %s\n", traceManager)
+				//klog.DumpStack("Dump Create manager:")
+				klog.V(3).Infof("Create manager: %s\n", traceManager)
+				//obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, traceManager)
+
+				// test mf update
+
+				tidlr := map[string]string{}
+				for _, mf := range xobj.GetManagedFields() {
+					tidlr[mf.TraceContext] = mf.TraceContextProcess
+				}
+
 				obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, traceManager)
+
+				xobj, _ = meta.Accessor(obj)
+				mfs := xobj.GetManagedFields()
+				for i, mf := range mfs {
+					mf.TraceContextProcess = tidlr[mf.TraceContext]
+					mfs[i] = mf
+				}
+				xobj.SetManagedFields(mfs)
+
 			}
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
