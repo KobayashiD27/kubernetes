@@ -166,7 +166,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	internal.RemoveObjectManagedFields(liveObj)
 	internal.RemoveObjectManagedFields(newObj)
 
-	klog.V(3).InfoS("tracecontext", "manager", manager, "newObj", newObj, "managed", managed)
+	//klog.InfoS("tracecontext", "manager", manager, "newObj", newObj, "managed", managed)
 	if object, managed, err = f.fieldManager.Update(liveObj, newObj, managed, manager); err != nil {
 		return nil, err
 	}

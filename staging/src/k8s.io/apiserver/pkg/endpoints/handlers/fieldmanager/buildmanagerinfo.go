@@ -49,7 +49,7 @@ func (f *buildManagerInfoManager) Update(liveObj, newObj runtime.Object, managed
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
-	klog.V(3).InfoS("tracecontext", "manager", manager, "newObj", newObj, "managed", managed)
+	klog.V(2).InfoS("tracecontext", "manager", manager, "newObj", newObj, "managed", managed)
 	return f.fieldManager.Update(liveObj, newObj, managed, manager)
 }
 
@@ -64,18 +64,26 @@ func (f *buildManagerInfoManager) Apply(liveObj, appliedObj runtime.Object, mana
 }
 
 func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
-	klog.DumpStack("Dump buildManagerInfo")
+	//klog.DumpStack("Dump buildManagerInfo")
 	traceContextString := "null"
+	traceContextProcessString := ""
+	//if len(prefix) > 84 {
+	//	s := strings.Split(prefix, "-")
+	//	traceContextProcessString = s[1]
+	//	traceContextString = strings.Join(s[1:4], "-")
+	//	prefix = strings.Join(s[4:], "-")
+	//} else if len(prefix) > 52 {
 	if len(prefix) > 52 {
 		s := strings.Split(prefix, "-")
 		traceContextString = strings.Join(s[:3], "-")
 		prefix = strings.Join(s[3:], "-")
 	}
 	managerInfo := metav1.ManagedFieldsEntry{
-		Manager:      prefix,
-		Operation:    operation,
-		APIVersion:   f.groupVersion.String(),
-		TraceContext: traceContextString,
+		Manager:             prefix,
+		Operation:           operation,
+		APIVersion:          f.groupVersion.String(),
+		TraceContext:        traceContextString,
+		TraceContextProcess: traceContextProcessString,
 	}
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"
