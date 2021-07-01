@@ -30,11 +30,14 @@ import (
 
 	apitrace "go.opentelemetry.io/otel/api/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"go.opentelemetry.io/otel/api/global"
 )
 
 type contextKeyType int
 
 const spanContextAnnotationKey string = "trace.kubernetes.io/context"
+const contextProcessKey string = "contextProcessKey"
 
 func stringToSpanContext(sc string) apitrace.SpanContext {
 	id, _ := apitrace.IDFromHex(sc[0:32])
@@ -135,16 +138,21 @@ func WithObject(ctx context.Context, meta metav1.Object, obv int64) context.Cont
 	} else if len(bcontext) > 0 {
 		latestContext = bcontext[0]
 	} else {
-		latestContext = "6617856f277e317fa7aab4c66e0041c9-2aa8325022d99d40-0"
+		//latestContext = "6617856f277e317fa7aab4c66e0041c9-2aa8325022d99d40-0"
+		latestContext = "00000000000000000000000000000001-0000000000000001-0"
 		klog.V(3).InfoS("CCC: Trace request", "object", klog.KObj(meta), "ObG", obv, "Generation", meta.GetGeneration(), "trace-id", latestContext)
 	}
 
 	span := httpTraceSpan{
 		spanContext: stringToSpanContext(latestContext),
 	}
-	//klog.V(3).InfoS("Trace request", "object", klog.KObj(meta), "trace-id", latestContext)
+	klog.V(3).InfoS("Trace request", "object", klog.KObj(meta), "trace-id", latestContext)
 	return apitrace.ContextWithSpan(ctx, span)
-	// return spanContextFromAnnotations(ctx, meta, meta.GetAnnotations())
+	//return spanContextFromAnnotations(ctx, meta, meta.GetAnnotations())
+
+	//ctx, span = StartSpan(ctx)
+	//defer span.End()
+	//return ctx
 }
 
 // spanContextFromAnnotations get span context from annotations
@@ -190,4 +198,46 @@ func decodeSpanContext(encodedSpanContext string) (apitrace.SpanContext, error) 
 		return apitrace.EmptySpanContext(), err
 	}
 	return spanContext, nil
+}
+
+// StartSpan
+
+func StartSpan(ctx context.Context) (context.Context, apitrace.Span) {
+	tidlSpan := apitrace.SpanFromContext(ctx)
+	klog.Infof("TID-L:%v-%v", tidlSpan.SpanContext().TraceID, tidlSpan.SpanContext().SpanID)
+	tp := global.TracerProvider()
+	tracer := tp.Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "testtest")
+	klog.Infof("TID-R:%v-%v", span.SpanContext().TraceID, span.SpanContext().SpanID)
+	//return debugContext(ctx, span)
+	return ctx, span
+
+}
+
+func debugContext(ctx context.Context, span apitrace.Span) (context.Context, apitrace.Span) {
+
+	ctx = context.WithValue(ctx, contextProcessKey, span.SpanContext().TraceID)
+	klog.Infof("check span.TraceID-SpanID-ctx(key) %v-%v-%v", span.SpanContext().TraceID, span.SpanContext().SpanID, ctx.Value(contextProcessKey))
+	return ctx, span
+}
+
+func UpdateTidList(meta metav1.Object, span apitrace.Span) []metav1.ManagedFieldsEntry {
+	klog.Infof("request-check span.TraceID-SpanID %v-%v", span.SpanContext().TraceID, span.SpanContext().SpanID)
+	managedFields := meta.GetManagedFields()
+	for i, mf := range managedFields {
+		if mf.TraceContextProcess == "" {
+			mf.TraceContextProcess = span.SpanContext().TraceID.String() + "-" + span.SpanContext().SpanID.String()
+			managedFields[i] = mf
+			klog.Infof("related TraceID-L %v", mf.TraceContext)
+		}
+	}
+	return managedFields
+
+}
+
+func TraceIDFromContext(ctx context.Context) string {
+	if tid, has := ctx.Value(contextProcessKey).(string); has {
+		return tid
+	}
+	return ""
 }
