@@ -1220,6 +1220,13 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 							Format:      "",
 						},
 					},
+					"traceContextProcess": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TraceContextProcess is the tracecontext bound to a specific controller roop",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},

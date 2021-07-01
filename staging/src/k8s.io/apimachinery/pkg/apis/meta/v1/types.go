@@ -1160,6 +1160,8 @@ type ManagedFieldsEntry struct {
 	FieldsV1 *FieldsV1 `json:"fieldsV1,omitempty" protobuf:"bytes,7,opt,name=fieldsV1"`
 	// TraceContext is the tracecontext bound to a specific request
 	TraceContext string `json:"traceContext,omitempty" protobuf:"bytes,8,opt,name=traceContext"`
+	// TraceContextProcess is the tracecontext bound to a specific controller roop
+	TraceContextProcess string `json:"traceContextProcess,omitempty" protobuf:"bytes,9,opt,name=traceContextProcess"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
