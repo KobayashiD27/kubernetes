@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,8 +46,11 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/traces"
 	"k8s.io/klog/v2"
 )
+
+var propagator = traces.Propagators()
 
 var (
 	// longThrottleLatency defines threshold for logging requests. All requests being
@@ -966,7 +970,8 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		if err != nil {
 			return err
 		}
-
+		// Inject span context and baggage into request header
+		propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 		r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
 		if retryAfter != nil {
 			// We are retrying the request that we already send to apiserver

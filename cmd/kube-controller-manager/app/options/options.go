@@ -90,6 +90,7 @@ type KubeControllerManagerOptions struct {
 	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
 	Metrics        *metrics.Options
 	Logs           *logs.Options
+	Traces         *cmoptions.TracingOptions
 
 	Master                      string
 	Kubeconfig                  string
@@ -183,6 +184,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Metrics:        metrics.NewOptions(),
 		Logs:           logs.NewOptions(),
+		Traces:         cmoptions.NewTracingOptions(),
 	}
 
 	s.Authentication.RemoteKubeConfigFileOptional = true
@@ -268,6 +270,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
+	s.Traces.AddFlags(fss.FlagSet("traces"))
 
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
@@ -280,6 +283,9 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 // ApplyTo fills up controller manager config with options.
 func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) error {
 	if err := s.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
+		return err
+	}
+	if err := s.Traces.ApplyTo(&c.ComponentConfig.Generic); err != nil {
 		return err
 	}
 	if err := s.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
