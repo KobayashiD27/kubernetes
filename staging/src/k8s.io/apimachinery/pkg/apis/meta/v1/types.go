@@ -1188,6 +1188,10 @@ type ManagedFieldsEntry struct {
 	// Note that the APIVersion field is not related to the Subresource field and
 	// it always corresponds to the version of the main resource.
 	Subresource string `json:"subresource,omitempty" protobuf:"bytes,8,opt,name=subresource"`
+
+	TraceContexts []string `json:"traceContexts,omitempty" protobuf:"bytes,9,opt,name=traceContexts"`
+
+	TraceGeneration *int64 `json:"traceGeneration,omitempty" protobuf:"varint,10,opt,name=traceGeneration"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.

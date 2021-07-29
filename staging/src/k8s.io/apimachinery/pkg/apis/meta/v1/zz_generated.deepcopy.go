@@ -634,6 +634,16 @@ func (in *ManagedFieldsEntry) DeepCopyInto(out *ManagedFieldsEntry) {
 		*out = new(FieldsV1)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TraceContexts != nil {
+		in, out := &in.TraceContexts, &out.TraceContexts
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.TraceGeneration != nil {
+		in, out := &in.TraceGeneration, &out.TraceGeneration
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 

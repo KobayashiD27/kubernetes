@@ -596,6 +596,10 @@ message ManagedFieldsEntry {
   // Note that the APIVersion field is not related to the Subresource field and
   // it always corresponds to the version of the main resource.
   optional string subresource = 8;
+
+  repeated string traceContexts = 9;
+
+  optional int64 traceGeneration = 10;
 }
 
 // MicroTime is version of Time with microsecond level precision.
