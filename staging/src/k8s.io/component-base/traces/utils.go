@@ -18,15 +18,20 @@ package traces
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/exporters/otlp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
@@ -77,4 +82,87 @@ func WrapperFor(tp *trace.TracerProvider) transport.WrapperFunc {
 // Propagators returns the recommended set of propagators.
 func Propagators() propagation.TextMapPropagator {
 	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
+}
+
+type traceContextKey string
+
+const (
+	traceContextsKey traceContextKey = "traceContexts"
+)
+
+func ManagedFieldsToContext(ctx context.Context, managedFields []metav1.ManagedFieldsEntry, generation int64) context.Context {
+	if len(managedFields) == 0 {
+		return ctx
+	}
+
+	// Inject baggage
+	traceContextsMap := make(map[string]struct{})
+	maxIndex := 0
+	for index, managedField := range managedFields {
+		var traceGeneration int64 = 0
+		if managedField.TraceGeneration != nil {
+			traceGeneration = *managedField.TraceGeneration
+		}
+		if traceGeneration > generation {
+			for _, traceContext := range managedField.TraceContexts {
+				traceContextsMap[traceContext] = struct{}{}
+			}
+		}
+		if index > 0 && managedField.Time.After(managedFields[maxIndex].Time.Time) {
+			maxIndex = index
+		}
+	}
+
+	if len(traceContextsMap) == 0 {
+		for _, traceContext := range managedFields[maxIndex].TraceContexts {
+			traceContextsMap[traceContext] = struct{}{}
+		}
+	}
+
+	traceContexts := []string{}
+	for traceContext := range traceContextsMap {
+		if traceContext == "" {
+			continue
+		}
+		traceContexts = append(traceContexts, traceContext)
+	}
+
+	value, _ := json.Marshal(traceContexts)
+	ctx = baggage.ContextWithValues(ctx, attribute.String(string(traceContextsKey), string(value)))
+
+	// Inject span context
+	if len(traceContexts) == 0 {
+		return ctx
+	}
+
+	value, _ = hex.DecodeString(traceContexts[0])
+	var traceID trace.TraceID
+	copy(traceID[:], value[:])
+	spanContext := trace.SpanContext{}
+	spanContext = spanContext.WithTraceID(traceID)
+	spanContext = spanContext.WithSpanID(trace.SpanID{1})
+	return trace.ContextWithSpanContext(ctx, spanContext)
+}
+
+func WithTraceContext(ctx context.Context) context.Context {
+	// Baggage trace context
+	value := baggage.Value(ctx, attribute.Key(traceContextsKey)).AsString()
+	traceContexts := make([]string, 0)
+	json.Unmarshal([]byte(value), &traceContexts)
+
+	// New trace context
+	if len(traceContexts) == 0 {
+		traceContexts = append(traceContexts, trace.SpanFromContext(ctx).SpanContext().TraceID().String())
+	}
+
+	return context.WithValue(ctx, traceContextsKey, traceContexts)
+}
+
+func ValueTraceContext(ctx context.Context) []string {
+	traceContexts, ok := ctx.Value(traceContextsKey).([]string)
+	if !ok {
+		return nil
+	}
+
+	return traceContexts
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -56,11 +57,11 @@ type Manager interface {
 	// Update is used when the object has already been merged (non-apply
 	// use-case), and simply updates the managed fields in the output
 	// object.
-	Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error)
+	Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error)
 
 	// Apply is used when server-side apply is called, as it merges the
 	// object and updates the managed fields.
-	Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error)
+	Apply(ctx context.Context, liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error)
 }
 
 // FieldManager updates the managed fields and merge applied
@@ -164,7 +165,7 @@ func emptyManagedFieldsOnErr(managed Managed, err error) (Managed, error) {
 // Update is used when the object has already been merged (non-apply
 // use-case), and simply updates the managed fields in the output
 // object.
-func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (object runtime.Object, err error) {
+func (f *FieldManager) Update(ctx context.Context, liveObj, newObj runtime.Object, manager string) (object runtime.Object, err error) {
 	// First try to decode the managed fields provided in the update,
 	// This is necessary to allow directly updating managed fields.
 	isSubresource := f.subresource != ""
@@ -176,7 +177,7 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	internal.RemoveObjectManagedFields(liveObj)
 	internal.RemoveObjectManagedFields(newObj)
 
-	if object, managed, err = f.fieldManager.Update(liveObj, newObj, managed, manager); err != nil {
+	if object, managed, err = f.fieldManager.Update(ctx, liveObj, newObj, managed, manager); err != nil {
 		return nil, err
 	}
 
@@ -190,8 +191,8 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 // UpdateNoErrors is the same as Update, but it will not return
 // errors. If an error happens, the object is returned with
 // managedFields cleared.
-func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager string) runtime.Object {
-	obj, err := f.Update(liveObj, newObj, manager)
+func (f *FieldManager) UpdateNoErrors(ctx context.Context, liveObj, newObj runtime.Object, manager string) runtime.Object {
+	obj, err := f.Update(ctx, liveObj, newObj, manager)
 	if err != nil {
 		atMostEverySecond.Do(func() {
 			klog.ErrorS(err, "[SHOULD NOT HAPPEN] failed to update managedFields", "VersionKind",
@@ -222,7 +223,7 @@ func isResetManagedFields(managedFields []metav1.ManagedFieldsEntry) bool {
 
 // Apply is used when server-side apply is called, as it merges the
 // object and updates the managed fields.
-func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string, force bool) (object runtime.Object, err error) {
+func (f *FieldManager) Apply(ctx context.Context, liveObj, appliedObj runtime.Object, manager string, force bool) (object runtime.Object, err error) {
 	// If the object doesn't have metadata, apply isn't allowed.
 	accessor, err := meta.Accessor(liveObj)
 	if err != nil {
@@ -237,7 +238,7 @@ func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string,
 
 	internal.RemoveObjectManagedFields(liveObj)
 
-	object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+	object, managed, err = f.fieldManager.Apply(ctx, liveObj, appliedObj, managed, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
 			return nil, internal.NewConflictError(conflicts)

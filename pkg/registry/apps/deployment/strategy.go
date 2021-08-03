@@ -86,6 +86,15 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
+	for _, managedField := range deployment.ManagedFields {
+		if managedField.TraceGeneration == nil {
+			managedField.TraceGeneration = new(int64)
+		}
+		if *managedField.TraceGeneration <= 0 {
+			*managedField.TraceGeneration = deployment.Generation
+		}
+	}
+
 	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
@@ -125,6 +134,15 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	if !apiequality.Semantic.DeepEqual(newDeployment.Spec, oldDeployment.Spec) ||
 		!apiequality.Semantic.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
 		newDeployment.Generation = oldDeployment.Generation + 1
+	}
+
+	for _, managedField := range newDeployment.ManagedFields {
+		if managedField.TraceGeneration == nil {
+			managedField.TraceGeneration = new(int64)
+		}
+		if *managedField.TraceGeneration <= 0 {
+			*managedField.TraceGeneration = newDeployment.Generation
+		}
 	}
 }
 
@@ -194,6 +212,15 @@ func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Spec = oldDeployment.Spec
 	newDeployment.Labels = oldDeployment.Labels
+
+	for _, managedField := range newDeployment.ManagedFields {
+		if managedField.TraceGeneration == nil {
+			managedField.TraceGeneration = new(int64)
+		}
+		if *managedField.TraceGeneration <= 0 {
+			*managedField.TraceGeneration = newDeployment.Generation
+		}
+	}
 }
 
 // ValidateUpdate is the default update validation for an end user updating status

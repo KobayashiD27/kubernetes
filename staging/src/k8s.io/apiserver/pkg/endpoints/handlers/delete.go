@@ -39,6 +39,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/traces"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -67,6 +68,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
+		ctx = traces.WithTraceContext(ctx)
+
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 

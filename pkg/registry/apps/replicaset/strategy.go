@@ -93,6 +93,15 @@ func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	rs.Generation = 1
 
+	for _, managedField := range rs.ManagedFields {
+		if managedField.TraceGeneration == nil {
+			managedField.TraceGeneration = new(int64)
+		}
+		if *managedField.TraceGeneration <= 0 {
+			*managedField.TraceGeneration = rs.Generation
+		}
+	}
+
 	pod.DropDisabledTemplateFields(&rs.Spec.Template, nil)
 }
 
@@ -115,6 +124,15 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// the ReplicaSet has *seen*.
 	if !apiequality.Semantic.DeepEqual(oldRS.Spec, newRS.Spec) {
 		newRS.Generation = oldRS.Generation + 1
+	}
+
+	for _, managedField := range newRS.ManagedFields {
+		if managedField.TraceGeneration == nil {
+			managedField.TraceGeneration = new(int64)
+		}
+		if *managedField.TraceGeneration <= 0 {
+			*managedField.TraceGeneration = newRS.Generation
+		}
 	}
 }
 
@@ -234,6 +252,15 @@ func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 	oldRS := old.(*apps.ReplicaSet)
 	// update is not allowed to set spec
 	newRS.Spec = oldRS.Spec
+
+	for _, managedField := range newRS.ManagedFields {
+		if managedField.TraceGeneration == nil {
+			managedField.TraceGeneration = new(int64)
+		}
+		if *managedField.TraceGeneration <= 0 {
+			*managedField.TraceGeneration = newRS.Generation
+		}
+	}
 }
 
 func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

@@ -41,12 +41,14 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/traces"
 	utiltrace "k8s.io/utils/trace"
 )
 
 // UpdateResource returns a function that will handle a resource update
 func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update", traceFields(req)...)
 		defer trace.LogIfLong(500 * time.Millisecond)
@@ -68,6 +70,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
+		ctx = traces.WithTraceContext(ctx)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -136,7 +139,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
 			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
 				if shouldUpdateManagedFields {
-					return scope.FieldManager.UpdateNoErrors(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
+					return scope.FieldManager.UpdateNoErrors(ctx, liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
 				}
 				return newObj, nil
 			})

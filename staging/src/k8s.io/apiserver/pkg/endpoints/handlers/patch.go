@@ -50,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/traces"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -97,6 +98,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
+		ctx = traces.WithTraceContext(ctx)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -291,8 +293,8 @@ type patcher struct {
 }
 
 type patchMechanism interface {
-	applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error)
-	createNewObject() (runtime.Object, error)
+	applyPatchToCurrentObject(ctx context.Context, currentObject runtime.Object) (runtime.Object, error)
+	createNewObject(ctx context.Context) (runtime.Object, error)
 }
 
 type jsonPatcher struct {
@@ -301,7 +303,7 @@ type jsonPatcher struct {
 	fieldManager *fieldmanager.FieldManager
 }
 
-func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
+func (p *jsonPatcher) applyPatchToCurrentObject(ctx context.Context, currentObject runtime.Object) (runtime.Object, error) {
 	// Encode will convert & return a versioned object in JSON.
 	currentObjJS, err := runtime.Encode(p.codec, currentObject)
 	if err != nil {
@@ -323,12 +325,13 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent))
+		traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
+		objToUpdate = p.fieldManager.UpdateNoErrors(ctx, currentObject, objToUpdate, traceManager)
 	}
 	return objToUpdate, nil
 }
 
-func (p *jsonPatcher) createNewObject() (runtime.Object, error) {
+func (p *jsonPatcher) createNewObject(ctx context.Context) (runtime.Object, error) {
 	return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
 }
 
@@ -385,7 +388,7 @@ type smpPatcher struct {
 	fieldManager       *fieldmanager.FieldManager
 }
 
-func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
+func (p *smpPatcher) applyPatchToCurrentObject(ctx context.Context, currentObject runtime.Object) (runtime.Object, error) {
 	// Since the patch is applied on versioned objects, we need to convert the
 	// current object to versioned representation first.
 	currentVersionedObject, err := p.unsafeConvertor.ConvertToVersion(currentObject, p.kind.GroupVersion())
@@ -406,12 +409,13 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		newObj = p.fieldManager.UpdateNoErrors(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent))
+		traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
+		newObj = p.fieldManager.UpdateNoErrors(ctx, currentObject, newObj, traceManager)
 	}
 	return newObj, nil
 }
 
-func (p *smpPatcher) createNewObject() (runtime.Object, error) {
+func (p *smpPatcher) createNewObject(_ context.Context) (runtime.Object, error) {
 	return nil, errors.NewNotFound(p.resource.GroupResource(), p.name)
 }
 
@@ -424,7 +428,7 @@ type applyPatcher struct {
 	userAgent    string
 }
 
-func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {
+func (p *applyPatcher) applyPatchToCurrentObject(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
 	force := false
 	if p.options.Force != nil {
 		force = *p.options.Force
@@ -438,15 +442,16 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
 
-	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
+	traceManager := p.options.FieldManager
+	return p.fieldManager.Apply(ctx, obj, patchObj, traceManager, force)
 }
 
-func (p *applyPatcher) createNewObject() (runtime.Object, error) {
+func (p *applyPatcher) createNewObject(ctx context.Context) (runtime.Object, error) {
 	obj, err := p.creater.New(p.kind)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new object: %v", err)
 	}
-	return p.applyPatchToCurrentObject(obj)
+	return p.applyPatchToCurrentObject(ctx, obj)
 }
 
 // strategicPatchObject applies a strategic merge patch of <patchBytes> to
@@ -480,16 +485,16 @@ func strategicPatchObject(
 // applyPatch is called every time GuaranteedUpdate asks for the updated object,
 // and is given the currently persisted object as input.
 // TODO: rename this function because the name implies it is related to applyPatcher
-func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
+func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
 	// Make sure we actually have a persisted currentObject
 	p.trace.Step("About to apply patch")
 	currentObjectHasUID, err := hasUID(currentObject)
 	if err != nil {
 		return nil, err
 	} else if !currentObjectHasUID {
-		objToUpdate, patchErr = p.mechanism.createNewObject()
+		objToUpdate, patchErr = p.mechanism.createNewObject(ctx)
 	} else {
-		objToUpdate, patchErr = p.mechanism.applyPatchToCurrentObject(currentObject)
+		objToUpdate, patchErr = p.mechanism.applyPatchToCurrentObject(ctx, currentObject)
 	}
 
 	if patchErr != nil {

@@ -17,12 +17,14 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/component-base/traces"
 )
 
 type buildManagerInfoManager struct {
@@ -44,29 +46,31 @@ func NewBuildManagerInfoManager(f Manager, gv schema.GroupVersion, subresource s
 }
 
 // Update implements Manager.
-func (f *buildManagerInfoManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
-	manager, err := f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)
+func (f *buildManagerInfoManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+	manager, err := f.buildManagerInfo(ctx, manager, metav1.ManagedFieldsOperationUpdate)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
-	return f.fieldManager.Update(liveObj, newObj, managed, manager)
+	return f.fieldManager.Update(ctx, liveObj, newObj, managed, manager)
 }
 
 // Apply implements Manager.
-func (f *buildManagerInfoManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
-	manager, err := f.buildManagerInfo(manager, metav1.ManagedFieldsOperationApply)
+func (f *buildManagerInfoManager) Apply(ctx context.Context, liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+	manager, err := f.buildManagerInfo(ctx, manager, metav1.ManagedFieldsOperationApply)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
-	return f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+	return f.fieldManager.Apply(ctx, liveObj, appliedObj, managed, manager, force)
 }
 
-func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
+func (f *buildManagerInfoManager) buildManagerInfo(ctx context.Context, prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
 	managerInfo := metav1.ManagedFieldsEntry{
-		Manager:     prefix,
-		Operation:   operation,
-		APIVersion:  f.groupVersion.String(),
-		Subresource: f.subresource,
+		Manager:         prefix,
+		Operation:       operation,
+		APIVersion:      f.groupVersion.String(),
+		Subresource:     f.subresource,
+		TraceContexts:   traces.ValueTraceContext(ctx),
+		TraceGeneration: new(int64),
 	}
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"

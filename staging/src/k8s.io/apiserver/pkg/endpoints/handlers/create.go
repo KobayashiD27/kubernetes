@@ -43,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/traces"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -79,6 +80,9 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
 		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
 		defer cancel()
+
+		ctx = traces.WithTraceContext(ctx)
+
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
@@ -166,7 +170,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				if err != nil {
 					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
 				}
-				obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				obj = scope.FieldManager.UpdateNoErrors(ctx, liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
 				admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
 			}
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {

@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -73,7 +74,7 @@ func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter r
 }
 
 // Update implements Manager.
-func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+func (f *structuredMergeManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert new object to proper version: %v (from %v to %v)", err, newObj.GetObjectKind().GroupVersionKind(), f.groupVersion)
@@ -103,7 +104,7 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 }
 
 // Apply implements Manager.
-func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+func (f *structuredMergeManager) Apply(ctx context.Context, liveObj, patchObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
 	// Check that the patch object has the same version as the live object
 	if patchVersion := patchObj.GetObjectKind().GroupVersionKind().GroupVersion(); patchVersion != f.groupVersion {
 		return nil, nil,
