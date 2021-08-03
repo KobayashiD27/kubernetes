@@ -108,7 +108,7 @@ func ManagedFieldsToContext(ctx context.Context, managedFields []metav1.ManagedF
 				traceContextsMap[traceContext] = struct{}{}
 			}
 		}
-		if index > 0 && managedField.Time.After(managedFields[maxIndex].Time.Time) {
+		if index > 0 && managedField.Time != nil && managedFields[maxIndex].Time != nil && managedField.Time.After(managedFields[maxIndex].Time.Time) {
 			maxIndex = index
 		}
 	}

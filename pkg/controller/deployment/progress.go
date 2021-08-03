@@ -23,10 +23,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/traces"
 	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -35,6 +36,7 @@ import (
 // for example a resync of the deployment after it was scaled up. In those cases,
 // we shouldn't try to estimate any progress.
 func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
+	ctx := traces.ManagedFieldsToContext(context.Background(), d.ManagedFields, d.Status.ObservedGeneration)
 	newStatus := calculateStatus(allRSs, newRS, d)
 
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.
@@ -114,7 +116,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 
 	newDeployment := d
 	newDeployment.Status = newStatus
-	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(context.TODO(), newDeployment, metav1.UpdateOptions{})
+	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(ctx, newDeployment, metav1.UpdateOptions{})
 	return err
 }
 

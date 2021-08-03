@@ -27,7 +27,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1276,7 +1276,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 					}
 					defer wait.Done()
 					generateName := podGenerateNameWithIndex(job.Name, completionIndex)
-					err := jm.podControl.CreatePodsWithGenerateName(job.Namespace, template, job, metav1.NewControllerRef(job, controllerKind), generateName)
+					err := jm.podControl.CreatePodsWithGenerateName(context.TODO(), job.Namespace, template, job, metav1.NewControllerRef(job, controllerKind), generateName)
 					if err != nil {
 						if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 							// If the namespace is being torn down, we can safely ignore
