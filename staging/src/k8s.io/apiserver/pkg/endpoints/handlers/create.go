@@ -26,7 +26,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"go.opentelemetry.io/otel"
 	oteltrace "go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel/label"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -171,7 +173,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				klog.V(3).Infof("createHndler read TraceContext: %s", spanContextString)
 				traceManager := spanContextString + "-" + managerOrUserAgent(options.FieldManager, req.UserAgent())
 				//klog.DumpStack("Dump Create manager:")
-				klog.V(3).Infof("Create manager: %s\n", traceManager)
+				klog.Infof("Create manager: %s\n", traceManager)
 				//obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, traceManager)
 
 				// test mf update
@@ -185,11 +187,17 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 				xobj, _ = meta.Accessor(obj)
 				mfs := xobj.GetManagedFields()
+				relatedTIDString := otel.BaggageValue(req.Context(), label.Key("key")).AsString()
 				for i, mf := range mfs {
 					mf.TraceContextProcess = tidlr[mf.TraceContext]
+					if relatedTIDString != "" {
+						klog.Infof("relatedTID: %s", relatedTIDString)
+						mf.RelatedTraceContext = relatedTIDString
+					}
 					mfs[i] = mf
 				}
 				xobj.SetManagedFields(mfs)
+				// end test
 
 			}
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {

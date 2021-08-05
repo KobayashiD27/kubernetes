@@ -67,12 +67,6 @@ func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation meta
 	//klog.DumpStack("Dump buildManagerInfo")
 	traceContextString := "null"
 	traceContextProcessString := ""
-	//if len(prefix) > 84 {
-	//	s := strings.Split(prefix, "-")
-	//	traceContextProcessString = s[1]
-	//	traceContextString = strings.Join(s[1:4], "-")
-	//	prefix = strings.Join(s[4:], "-")
-	//} else if len(prefix) > 52 {
 	if len(prefix) > 52 {
 		s := strings.Split(prefix, "-")
 		traceContextString = strings.Join(s[:3], "-")
@@ -84,6 +78,7 @@ func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation meta
 		APIVersion:          f.groupVersion.String(),
 		TraceContext:        traceContextString,
 		TraceContextProcess: traceContextProcessString,
+		RelatedTraceContext: "",
 	}
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"

@@ -330,7 +330,24 @@ func (p *jsonPatcher) applyPatchToCurrentObject(ctx context.Context, currentObje
 		spanContextString := fmt.Sprintf("%s-%s-%d", spanContext.TraceID, spanContext.SpanID, xobj.GetGeneration())
 		traceManager := spanContextString + "-" + managerOrUserAgent(p.options.FieldManager, p.userAgent)
 		klog.V(3).Infof("applyPatchToCurrentObject read TraceContext: %s, traceManger: %s", spanContextString, traceManager)
+		//objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, traceManager)
+
+		// test mf update
+		xobj, _ = meta.Accessor(currentObject)
+		tidlr := map[string]string{}
+		for _, mf := range xobj.GetManagedFields() {
+			tidlr[mf.TraceContext] = mf.TraceContextProcess
+		}
+
 		objToUpdate = p.fieldManager.UpdateNoErrors(currentObject, objToUpdate, traceManager)
+
+		xobj, _ = meta.Accessor(objToUpdate)
+		mfs := xobj.GetManagedFields()
+		for i, mf := range mfs {
+			mf.TraceContextProcess = tidlr[mf.TraceContext]
+			mfs[i] = mf
+		}
+		xobj.SetManagedFields(mfs)
 	}
 	return objToUpdate, nil
 }
@@ -418,7 +435,24 @@ func (p *smpPatcher) applyPatchToCurrentObject(ctx context.Context, currentObjec
 		spanContextString := fmt.Sprintf("%s-%s-%d", spanContext.TraceID, spanContext.SpanID, xobj.GetGeneration())
 		traceManager := spanContextString + "-" + managerOrUserAgent(p.options.FieldManager, p.userAgent)
 		klog.V(3).Infof("smpPather applyPatchToCurrentObject read TraceContext: %s, traceManger: %s", spanContextString, traceManager)
+		//newObj = p.fieldManager.UpdateNoErrors(currentObject, newObj, traceManager)
+
+		// test mf update
+		tidlr := map[string]string{}
+		xobj, _ = meta.Accessor(currentObject)
+		for _, mf := range xobj.GetManagedFields() {
+			tidlr[mf.TraceContext] = mf.TraceContextProcess
+		}
+
 		newObj = p.fieldManager.UpdateNoErrors(currentObject, newObj, traceManager)
+
+		xobj, _ = meta.Accessor(newObj)
+		mfs := xobj.GetManagedFields()
+		for i, mf := range mfs {
+			mf.TraceContextProcess = tidlr[mf.TraceContext]
+			mfs[i] = mf
+		}
+		xobj.SetManagedFields(mfs)
 	}
 	return newObj, nil
 }
@@ -455,7 +489,24 @@ func (p *applyPatcher) applyPatchToCurrentObject(ctx context.Context, obj runtim
 	spanContextString := fmt.Sprintf("%s-%s-%d", spanContext.TraceID, spanContext.SpanID, xobj.GetGeneration())
 	traceManager := spanContextString + "-" + p.options.FieldManager
 	klog.V(3).Infof("applyPatcher applyPatchToCurrentObject read TraceContext: %s, traceManger: %s", spanContextString, traceManager)
-	return p.fieldManager.Apply(obj, patchObj, traceManager, force)
+	//return p.fieldManager.Apply(obj, patchObj, traceManager, force)
+	// test mf update
+	tidlr := map[string]string{}
+	xobj, _ = meta.Accessor(obj)
+	for _, mf := range xobj.GetManagedFields() {
+		tidlr[mf.TraceContext] = mf.TraceContextProcess
+	}
+
+	obj, err := p.fieldManager.Apply(obj, patchObj, traceManager, force)
+
+	xobj, _ = meta.Accessor(obj)
+	mfs := xobj.GetManagedFields()
+	for i, mf := range mfs {
+		mf.TraceContextProcess = tidlr[mf.TraceContext]
+		mfs[i] = mf
+	}
+	xobj.SetManagedFields(mfs)
+	return obj, err
 }
 
 func (p *applyPatcher) createNewObject(ctx context.Context) (runtime.Object, error) {

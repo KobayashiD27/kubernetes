@@ -161,6 +161,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 						mfs[i] = mf
 					}
 					xobj.SetManagedFields(mfs)
+					// end test mf update
 				}
 				return newObj, nil
 			})
