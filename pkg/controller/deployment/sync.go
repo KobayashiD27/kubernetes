@@ -35,19 +35,26 @@ import (
 )
 
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
-func (dc *DeploymentController) syncStatusOnly(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+func (dc *DeploymentController) syncStatusOnly(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+	ctx, span := httptrace.StartSpanFromContext(ctx)
+	defer span.End()
+
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
 	if err != nil {
 		return err
 	}
 
+	klog.Infof("syncStatusOnly")
 	allRSs := append(oldRSs, newRS)
-	return dc.syncDeploymentStatus(allRSs, newRS, d)
+	return dc.syncDeploymentStatus(ctx, allRSs, newRS, d)
 }
 
 // sync is responsible for reconciling deployments on scaling events or when they
 // are paused.
-func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+func (dc *DeploymentController) sync(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+	ctx, span := httptrace.StartSpanFromContext(ctx)
+	defer span.End()
+
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
 	if err != nil {
 		return err
@@ -65,8 +72,9 @@ func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaS
 		}
 	}
 
+	klog.Infof("sync")
 	allRSs := append(oldRSs, newRS)
-	return dc.syncDeploymentStatus(allRSs, newRS, d)
+	return dc.syncDeploymentStatus(ctx, allRSs, newRS, d)
 }
 
 // checkPausedConditions checks if the given deployment is paused or not and adds an appropriate condition.
@@ -75,7 +83,7 @@ func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaS
 func (dc *DeploymentController) checkPausedConditions(d *apps.Deployment) error {
 	// Get span from annotations and set to ctx
 	ctx := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
-	ctx, span := httptrace.StartSpan(ctx)
+	_, span := httptrace.StartSpan()
 	defer span.End()
 
 	if !deploymentutil.HasProgressDeadline(d) {
@@ -104,9 +112,10 @@ func (dc *DeploymentController) checkPausedConditions(d *apps.Deployment) error 
 	}
 
 	var err error
-	mfs := httptrace.UpdateTidList(d, span)
+	mfs := httptrace.UpdateTidList(d, span, "checkPausedConditions @107")
 	d.SetManagedFields(mfs)
-	_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+	//_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+	_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 	return err
 }
 
@@ -146,7 +155,7 @@ const (
 func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, oldRSs []*apps.ReplicaSet, createIfNotExisted bool) (*apps.ReplicaSet, error) {
 	// Get span from annotations and set to ctx
 	ctx := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
-	ctx, span := httptrace.StartSpan(ctx)
+	_, span := httptrace.StartSpan()
 	defer span.End()
 
 	existingNewRS := deploymentutil.FindNewReplicaSet(d, rsList)
@@ -168,9 +177,11 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		minReadySecondsNeedsUpdate := rsCopy.Spec.MinReadySeconds != d.Spec.MinReadySeconds
 		if annotationsUpdated || minReadySecondsNeedsUpdate {
 			rsCopy.Spec.MinReadySeconds = d.Spec.MinReadySeconds
-			mf := httptrace.UpdateTidList(d, span)
+			mf := httptrace.UpdateTidList(d, span, "getNewReplicaset @178")
 			d.SetManagedFields(mf)
-			return dc.client.AppsV1().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(context.TODO(), rsCopy, metav1.UpdateOptions{})
+			ctx = httptrace.MakeBaggageContext(ctx, d, span)
+			//return dc.client.AppsV1().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(context.TODO(), rsCopy, metav1.UpdateOptions{})
+			return dc.client.AppsV1().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(ctx, rsCopy, metav1.UpdateOptions{})
 		}
 
 		// Should use the revision in existingNewRS's annotation, since it set by before
@@ -187,10 +198,11 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		}
 
 		if needsUpdate {
-			mfs := httptrace.UpdateTidList(d, span)
+			mfs := httptrace.UpdateTidList(d, span, "getNewReplicasets@192")
 			d.SetManagedFields(mfs)
 			var err error
-			if _, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{}); err != nil {
+			//if _, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{}); err != nil {
+			if _, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
 		}
@@ -237,8 +249,10 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 	// hash collisions. If there is any other error, we need to report it in the status of
 	// the Deployment.
 	alreadyExists := false
-
-	createdRS, err := dc.client.AppsV1().ReplicaSets(d.Namespace).Create(context.TODO(), &newRS, metav1.CreateOptions{})
+	mf := httptrace.UpdateTidList(d, span, "getNewReplicasets@252")
+	d.SetManagedFields(mf)
+	ctx = httptrace.MakeBaggageContext(ctx, d, span)
+	createdRS, err := dc.client.AppsV1().ReplicaSets(d.Namespace).Create(ctx, &newRS, metav1.CreateOptions{})
 	switch {
 	// We may end up hitting this due to a slow cache or a fast resync of the Deployment.
 	case errors.IsAlreadyExists(err):
@@ -270,9 +284,10 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		*d.Status.CollisionCount++
 		// Update the collisionCount for the Deployment and let it requeue by returning the original
 		// error.
-		mfs := httptrace.UpdateTidList(d, span)
+		mfs := httptrace.UpdateTidList(d, span, "getNewReplicasets, @276")
 		d.SetManagedFields(mfs)
-		_, dErr := dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+		//_, dErr := dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+		_, dErr := dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 		if dErr == nil {
 			klog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
 		}
@@ -288,9 +303,10 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			// We don't really care about this error at this point, since we have a bigger issue to report.
 			// TODO: Identify which errors are permanent and switch DeploymentIsFailed to take into account
 			// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
-			mfs := httptrace.UpdateTidList(d, span)
+			mfs := httptrace.UpdateTidList(d, span, "getNewReplicasets @295")
 			d.SetManagedFields(mfs)
-			_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+			//_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+			_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 		}
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
 		return nil, err
@@ -307,9 +323,10 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		needsUpdate = true
 	}
 	if needsUpdate {
-		mfs := httptrace.UpdateTidList(d, span)
+		mfs := httptrace.UpdateTidList(d, span, "getNewReplicasets @315")
 		d.SetManagedFields(mfs)
-		_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+		//_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+		_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 	}
 	return createdRS, err
 }
@@ -435,7 +452,7 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *apps.ReplicaSe
 func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, scalingOperation string) (bool, *apps.ReplicaSet, error) {
 	// Get span from annotations and set to ctx
 	ctx := httptrace.WithObject(context.Background(), rs, rs.Status.ObservedGeneration)
-	ctx, span := httptrace.StartSpan(ctx)
+	_, span := httptrace.StartSpan()
 	defer span.End()
 
 	sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
@@ -448,7 +465,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 		rsCopy := rs.DeepCopy()
 		*(rsCopy.Spec.Replicas) = newScale
 		deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
-		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(context.TODO(), rsCopy, metav1.UpdateOptions{})
+		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(ctx, rsCopy, metav1.UpdateOptions{})
 		if err == nil && sizeNeedsUpdate {
 			scaled = true
 			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
@@ -462,8 +479,8 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 // around by default 1) for historical reasons and 2) for the ability to rollback a deployment.
 func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) error {
 	// Get span from annotations and set to ctx
-	ctx := httptrace.WithObject(context.Background(), deployment, deployment.Status.ObservedGeneration)
-	ctx, span := httptrace.StartSpan(ctx)
+	//ctx := httptrace.WithObject(context.Background(), deployment, deployment.Status.ObservedGeneration)
+	_, span := httptrace.StartSpan()
 	defer span.End()
 
 	if !deploymentutil.HasRevisionHistoryLimit(deployment) {
@@ -503,10 +520,10 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 }
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
-func (dc *DeploymentController) syncDeploymentStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
+func (dc *DeploymentController) syncDeploymentStatus(ctx context.Context, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
 	// Get span and baggage from object and set to ctx
-	ctx := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
-	ctx, span := httptrace.StartSpan(ctx)
+	ctxL := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
+	ctx, span := httptrace.StartSpanFromContext(ctx)
 	defer span.End()
 
 	newStatus := calculateStatus(allRSs, newRS, d)
@@ -515,11 +532,12 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*apps.ReplicaSet, 
 		return nil
 	}
 
-	mfs := httptrace.UpdateTidList(d, span)
+	mfs := httptrace.UpdateTidList(d, span, "syncDeploymentStatus @524")
 	d.SetManagedFields(mfs)
 	newDeployment := d
 	newDeployment.Status = newStatus
-	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(context.TODO(), newDeployment, metav1.UpdateOptions{})
+	//_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(context.TODO(), newDeployment, metav1.UpdateOptions{})
+	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(ctxL, newDeployment, metav1.UpdateOptions{})
 	return err
 }
 

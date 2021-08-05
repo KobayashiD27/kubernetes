@@ -40,7 +40,7 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 	newStatus := calculateStatus(allRSs, newRS, d)
 
 	ctx := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
-	ctx, span := httptrace.StartSpan(ctx)
+	_, span := httptrace.StartSpan()
 	defer span.End()
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.
 	if !util.HasProgressDeadline(d) {
@@ -117,11 +117,12 @@ func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, new
 		return nil
 	}
 
-	mfs := httptrace.UpdateTidList(d, span)
+	mfs := httptrace.UpdateTidList(d, span, "syncRolloutStatus @120")
 	d.SetManagedFields(mfs)
 	newDeployment := d
 	newDeployment.Status = newStatus
-	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(context.TODO(), newDeployment, metav1.UpdateOptions{})
+	//_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(context.TODO(), newDeployment, metav1.UpdateOptions{})
+	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(ctx, newDeployment, metav1.UpdateOptions{})
 	return err
 }
 

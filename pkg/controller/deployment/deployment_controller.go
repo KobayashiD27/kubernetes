@@ -596,7 +596,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	// trace test
 	//ctx, span := httptrace.StartSpanFromObject(context.Background(), d, "deployment-controller:syncDeployment")
 	ctx := httptrace.WithObject(context.Background(), d, d.Status.ObservedGeneration)
-	ctx, span := httptrace.StartSpan(ctx)
+	currentCtx, span := httptrace.StartSpan()
 	defer span.End()
 
 	everything := metav1.LabelSelector{}
@@ -604,9 +604,10 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
 		if d.Status.ObservedGeneration < d.Generation {
 			d.Status.ObservedGeneration = d.Generation
-			mfs := httptrace.UpdateTidList(d, span)
+			mfs := httptrace.UpdateTidList(d, span, "syncDeployment @607")
 			d.SetManagedFields(mfs)
-			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+			//dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
+			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 		}
 		return nil
 	}
@@ -628,7 +629,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if d.DeletionTimestamp != nil {
-		return dc.syncStatusOnly(d, rsList)
+		return dc.syncStatusOnly(currentCtx, d, rsList)
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
@@ -639,7 +640,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if d.Spec.Paused {
-		return dc.sync(d, rsList)
+		return dc.sync(currentCtx, d, rsList)
 	}
 
 	// rollback is not re-entrant in case the underlying replica sets are updated with a new
@@ -654,7 +655,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return err
 	}
 	if scalingEvent {
-		return dc.sync(d, rsList)
+		return dc.sync(currentCtx, d, rsList)
 	}
 
 	switch d.Spec.Strategy.Type {
