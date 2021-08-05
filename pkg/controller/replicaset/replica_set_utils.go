@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/util/httptrace"
 )
 
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
@@ -54,6 +55,15 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 	klog.V(3).InfoS("updateReplicaSetStatus", "ReplicaSet", rs.Name, "obv", rs.Status.ObservedGeneration, "Generation", rs.Generation)
 	newStatus.ObservedGeneration = rs.Generation
 
+	//trace start
+	//_ := httptrace.WithObject(context.TODO(), rs, rs.Status.ObservedGeneration)
+	currCtx, span := httptrace.StartSpan()
+	defer span.End()
+
+	//trace test
+	mf := httptrace.UpdateTidList(rs, span, "replicasetutil(updateRSStatus) @62")
+	rs.SetManagedFields(mf)
+
 	var getErr, updateErr error
 	var updatedRS *apps.ReplicaSet
 	for i, rs := 0, rs; ; i++ {
@@ -65,7 +75,8 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, newStatus.ObservedGeneration))
 
 		rs.Status = newStatus
-		updatedRS, updateErr = c.UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{})
+		//updatedRS, updateErr = c.UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{})
+		updatedRS, updateErr = c.UpdateStatus(currCtx, rs, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return updatedRS, nil
 		}
