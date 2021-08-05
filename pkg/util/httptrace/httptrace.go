@@ -23,6 +23,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	//"sort"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,9 @@ import (
 	apitrace "go.opentelemetry.io/otel/api/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/label"
 )
 
 type contextKeyType int
@@ -202,16 +205,19 @@ func decodeSpanContext(encodedSpanContext string) (apitrace.SpanContext, error) 
 
 // StartSpan
 
-func StartSpan(ctx context.Context) (context.Context, apitrace.Span) {
-	tidlSpan := apitrace.SpanFromContext(ctx)
-	klog.Infof("TID-L:%v-%v", tidlSpan.SpanContext().TraceID, tidlSpan.SpanContext().SpanID)
+func StartSpanFromContext(ctx context.Context) (context.Context, apitrace.Span) {
+	//tidlSpan := apitrace.SpanFromContext(ctx)
+	//klog.Infof("TID-L:%v-%v", tidlSpan.SpanContext().TraceID, tidlSpan.SpanContext().SpanID)
 	tp := global.TracerProvider()
 	tracer := tp.Tracer("test")
-	ctx, span := tracer.Start(context.Background(), "testtest")
-	klog.Infof("TID-R:%v-%v", span.SpanContext().TraceID, span.SpanContext().SpanID)
-	//return debugContext(ctx, span)
-	return ctx, span
+	tidrCtx, span := tracer.Start(ctx, "testtest")
+	//klog.Infof("TID-R:%v-%v", span.SpanContext().TraceID, span.SpanContext().SpanID)
+	return tidrCtx, span
 
+}
+
+func StartSpan() (context.Context, apitrace.Span) {
+	return StartSpanFromContext(context.Background())
 }
 
 func debugContext(ctx context.Context, span apitrace.Span) (context.Context, apitrace.Span) {
@@ -221,18 +227,19 @@ func debugContext(ctx context.Context, span apitrace.Span) (context.Context, api
 	return ctx, span
 }
 
-func UpdateTidList(meta metav1.Object, span apitrace.Span) []metav1.ManagedFieldsEntry {
-	klog.Infof("request-check span.TraceID-SpanID %v-%v", span.SpanContext().TraceID, span.SpanContext().SpanID)
+func UpdateTidList(meta metav1.Object, span apitrace.Span, text ...string) []metav1.ManagedFieldsEntry {
+	klog.Infof("function:%s", text)
+	klog.Infof("request-check TID-R/ span.TraceID-SpanID:%v-%v", span.SpanContext().TraceID, span.SpanContext().SpanID)
 	managedFields := meta.GetManagedFields()
 	for i, mf := range managedFields {
 		if mf.TraceContextProcess == "" {
 			mf.TraceContextProcess = span.SpanContext().TraceID.String() + "-" + span.SpanContext().SpanID.String()
 			managedFields[i] = mf
 			klog.Infof("related TraceID-L %v", mf.TraceContext)
+			ParseRelatedTraceIDString(mf.RelatedTraceContext)
 		}
 	}
 	return managedFields
-
 }
 
 func TraceIDFromContext(ctx context.Context) string {
@@ -240,4 +247,43 @@ func TraceIDFromContext(ctx context.Context) string {
 		return tid
 	}
 	return ""
+}
+
+func SpanFromContext(ctx context.Context) apitrace.Span {
+	return apitrace.SpanFromContext(ctx)
+}
+
+func MakeBaggageContext(ctx context.Context, meta metav1.Object, span apitrace.Span) context.Context {
+	val := ""
+	managedFields := meta.GetManagedFields()
+	for _, mf := range managedFields {
+		if mf.TraceContextProcess == span.SpanContext().TraceID.String()+"-"+span.SpanContext().SpanID.String() {
+			val = val + mf.TraceContext + "-"
+		}
+	}
+
+	bag := label.String("key", val)
+	ctx = otel.ContextWithBaggageValues(ctx, bag)
+	klog.Infof("check bag : %v", otel.BaggageValue(ctx, label.Key("key")).AsString())
+	return ctx
+}
+
+func GetBaggageValue(ctx context.Context) string {
+	key := label.Key("key")
+	baggageValue := otel.BaggageValue(ctx, key)
+	klog.Infof("check propagated bag : %v", baggageValue.AsString())
+	return baggageValue.AsString()
+}
+
+func ParseRelatedTraceIDString(rtid string) []string {
+	rtids := strings.Split(rtid, "-")
+	var res []string
+	for n := 1; ; n++ {
+		if 3*n-1 > len(rtids) {
+			break
+		}
+		res = append(res, strings.Join(rtids[3*n-3:3*n], "-"))
+	}
+	klog.Infof("rtids %s", res)
+	return res
 }
