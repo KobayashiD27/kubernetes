@@ -35,6 +35,7 @@ import (
 
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
+	"strings"
 )
 
 // NewProvider initializes tracing in the component, and enforces recommended tracing behavior.
@@ -165,4 +166,129 @@ func ValueTraceContext(ctx context.Context) []string {
 	}
 
 	return traceContexts
+}
+
+// tracing TIDLR functions
+
+const (
+	traceContextRequestKey     traceContextKey = "traceContextRequest"
+	relatedTraceContextKey     traceContextKey = "relatedTraceContext"
+	listRelatedTraceContextKey traceContextKey = "listRelatedTraceContext"
+)
+
+func StartSpanFromContext(ctx context.Context) (context.Context, trace.Span) {
+	klog.Infof("StartSpan")
+	opts := []otlpgrpc.Option{}
+	sampler := sdktrace.NeverSample()
+	resourceOpts := []resource.Option{}
+
+	tp := NewProvider(ctx, sampler, resourceOpts, opts...)
+	tracer := tp.Tracer("TestTracer")
+	return tracer.Start(ctx, "TraceTest")
+}
+func StartSpan() (context.Context, trace.Span) {
+	return StartSpanFromContext(context.TODO())
+}
+
+func UpdateTidList(ctx context.Context, meta metav1.Object, span trace.Span, text ...string) (context.Context, []metav1.ManagedFieldsEntry) {
+	klog.Infof("function:%s", text)
+	klog.Infof("request-check TID-Process/ span.TraceID-SpanID: %v-%v", span.SpanContext().TraceID(), span.SpanContext().SpanID())
+	var relatedTraceContexts []string
+	managedFields := meta.GetManagedFields()
+	for i, mf := range managedFields {
+		if mf.TraceContextProcess == "" && mf.Subresource == "" {
+			mf.TraceContextProcess = span.SpanContext().TraceID().String() + "-" + span.SpanContext().SpanID().String()
+			managedFields[i] = mf
+			klog.Infof("Related TID-Request/TraceID-SpanID: %v", mf.TraceContextRequest)
+			relatedTraceContexts = append(relatedTraceContexts, mf.TraceContextRequest)
+		}
+	}
+	ctx = context.WithValue(ctx, string(listRelatedTraceContextKey), relatedTraceContexts)
+	return ctx, managedFields
+}
+
+func GetListRelatedTraceContext(ctx context.Context) []string {
+	list, ok := ctx.Value(string(listRelatedTraceContextKey)).([]string)
+	if !ok {
+		return nil
+	}
+	klog.Infof("Print RelatedTraceContexts:")
+	for _, str := range list {
+		klog.Infof("%v", str)
+	}
+	return list
+}
+
+func StringTraceContext(ctx context.Context) string {
+	traceContexts, ok := ctx.Value(traceContextsKey).([]string)
+	if !ok {
+		return ""
+	}
+
+	res := ""
+	for _, str := range traceContexts {
+		res = res + "-" + str
+	}
+	return res
+}
+
+func ParseRelatedTraceIDString(rtid string) []string {
+	rtids := strings.Split(rtid, "-")
+	var res []string
+	for _, id := range rtids {
+		res = append(res, id)
+	}
+	klog.Infof("rtids %s", res)
+	return res
+}
+
+func SpanContextFromContext(ctx context.Context) trace.SpanContext {
+	return trace.SpanContextFromContext(ctx)
+}
+
+func WithTraceContextRequest(ctx context.Context, tcr string) context.Context {
+	return baggage.ContextWithValues(ctx, attribute.String(string(traceContextRequestKey), tcr))
+}
+
+func GetTraceContextRequest(ctx context.Context) string {
+	res := baggage.Value(ctx, attribute.Key(traceContextRequestKey)).AsString()
+	if res == "" {
+		spc := SpanContextFromContext(ctx)
+		res = spc.TraceID().String() + "-" + spc.SpanID().String()
+	}
+	return res
+}
+
+func WithRelatedTraceContext(ctx context.Context, tcr string) context.Context {
+	return baggage.ContextWithValues(ctx, attribute.String(string(relatedTraceContextKey), tcr))
+}
+
+func GetRelatedTraceContext(ctx context.Context) string {
+	res := baggage.Value(ctx, attribute.Key(relatedTraceContextKey)).AsString()
+	return res
+}
+
+func ContextWithSpan(ctx context.Context, span trace.Span) context.Context {
+	return trace.ContextWithSpan(ctx, span)
+}
+
+func MakeRelatedTraceContextBaggageValue(meta metav1.Object, span trace.Span) string {
+	val := ""
+	managedFields := meta.GetManagedFields()
+	for _, mf := range managedFields {
+		klog.Infof("Check tids, mf: %s, span: %s", mf.TraceContextProcess, span.SpanContext().TraceID().String()+"-"+span.SpanContext().SpanID().String())
+		if isSameTIDProcess(mf.TraceContextProcess, span) && mf.Subresource == "" {
+			val = val + mf.TraceContextRequest + "-"
+		}
+	}
+	klog.Infof("BagValue : %s", val)
+	return val
+}
+
+func isSameTIDProcess(tcp string, span trace.Span) bool {
+
+	// parse tcp
+	tcpList := strings.Split(tcp, "-")
+	tcpTraceID := tcpList[0]
+	return tcpTraceID == span.SpanContext().TraceID().String()
 }
