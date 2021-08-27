@@ -545,6 +545,12 @@ func (rsc *ReplicaSetController) processNextWorkItem() bool {
 // It will requeue the replica set in case of an error while creating/deleting pods.
 func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
 	ctx := traces.ManagedFieldsToContext(context.Background(), rs.ManagedFields, rs.Status.ObservedGeneration)
+	// test mf
+	_, span := traces.StartSpan()
+	ctx = traces.ContextWithSpan(ctx, span)
+	ctx, mfs := traces.UpdateTidList(ctx, rs, span, "replica_set.go@551] manageReplicas")
+	rs.SetManagedFields(mfs)
+
 	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
