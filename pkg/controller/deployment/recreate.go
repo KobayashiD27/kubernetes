@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,9 +26,9 @@ import (
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
-func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) error {
+func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) error {
 	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down.
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, false)
 	if err != nil {
 		return err
 	}
@@ -41,17 +42,17 @@ func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*ap
 	}
 	if scaledDown {
 		// Update DeploymentStatus.
-		return dc.syncRolloutStatus(allRSs, newRS, d)
+		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	// Do not process a deployment when it has old pods running.
 	if oldPodsRunning(newRS, oldRSs, podMap) {
-		return dc.syncRolloutStatus(allRSs, newRS, d)
+		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	// If we need to create a new RS, create it now.
 	if newRS == nil {
-		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)
+		newRS, oldRSs, err = dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, true)
 		if err != nil {
 			return err
 		}
@@ -70,7 +71,7 @@ func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*ap
 	}
 
 	// Sync deployment status.
-	return dc.syncRolloutStatus(allRSs, newRS, d)
+	return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 }
 
 // scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate".

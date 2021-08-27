@@ -593,6 +593,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	d := deployment.DeepCopy()
 	ctx := traces.ManagedFieldsToContext(context.Background(), d.ManagedFields, d.Status.ObservedGeneration)
 
+	//Test Tracing
+	currCtx, span := traces.StartSpan()
+	defer span.End()
+	ctx = traces.ContextWithSpan(ctx, span)
+	klog.Infof("Test Tracing, TraceID, SpanID: %s, %s", span.SpanContext().TraceID(), span.SpanContext().SpanID())
+	currCtx, mfs := traces.UpdateTidList(currCtx, d, span, "syncDeploynemt @deployment_controller.go")
+	d.SetManagedFields(mfs)
+
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
@@ -620,40 +628,40 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if d.DeletionTimestamp != nil {
-		return dc.syncStatusOnly(d, rsList)
+		return dc.syncStatusOnly(currCtx, d, rsList)
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
 	// a deployment. In this way, we can be sure that we won't timeout when a user
 	// resumes a Deployment with a set progressDeadlineSeconds.
-	if err = dc.checkPausedConditions(d); err != nil {
+	if err = dc.checkPausedConditions(currCtx, d); err != nil {
 		return err
 	}
 
 	if d.Spec.Paused {
-		return dc.sync(d, rsList)
+		return dc.sync(currCtx, d, rsList)
 	}
 
 	// rollback is not re-entrant in case the underlying replica sets are updated with a new
 	// revision so we should ensure that we won't proceed to update replica sets until we
 	// make sure that the deployment has cleaned up its rollback spec in subsequent enqueues.
 	if getRollbackTo(d) != nil {
-		return dc.rollback(d, rsList)
+		return dc.rollback(currCtx, d, rsList)
 	}
 
-	scalingEvent, err := dc.isScalingEvent(d, rsList)
+	scalingEvent, err := dc.isScalingEvent(currCtx, d, rsList)
 	if err != nil {
 		return err
 	}
 	if scalingEvent {
-		return dc.sync(d, rsList)
+		return dc.sync(currCtx, d, rsList)
 	}
 
 	switch d.Spec.Strategy.Type {
 	case apps.RecreateDeploymentStrategyType:
-		return dc.rolloutRecreate(d, rsList, podMap)
+		return dc.rolloutRecreate(currCtx, d, rsList, podMap)
 	case apps.RollingUpdateDeploymentStrategyType:
-		return dc.rolloutRolling(d, rsList)
+		return dc.rolloutRolling(currCtx, d, rsList)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }

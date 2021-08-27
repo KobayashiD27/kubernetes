@@ -35,8 +35,11 @@ import (
 // cases this helper will run that cannot be prevented from the scaling detection,
 // for example a resync of the deployment after it was scaled up. In those cases,
 // we shouldn't try to estimate any progress.
-func (dc *DeploymentController) syncRolloutStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
+func (dc *DeploymentController) syncRolloutStatus(currCtx context.Context, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
 	ctx := traces.ManagedFieldsToContext(context.Background(), d.ManagedFields, d.Status.ObservedGeneration)
+	_, span := traces.StartSpanFromContext(currCtx)
+	defer span.End()
+
 	newStatus := calculateStatus(allRSs, newRS, d)
 
 	// If there is no progressDeadlineSeconds set, remove any Progressing condition.

@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -28,8 +29,8 @@ import (
 )
 
 // rolloutRolling implements the logic for rolling a new replica set.
-func (dc *DeploymentController) rolloutRolling(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, true)
+func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, true)
 	if err != nil {
 		return err
 	}
@@ -42,7 +43,7 @@ func (dc *DeploymentController) rolloutRolling(d *apps.Deployment, rsList []*app
 	}
 	if scaledUp {
 		// Update DeploymentStatus
-		return dc.syncRolloutStatus(allRSs, newRS, d)
+		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	// Scale down, if we can.
@@ -52,7 +53,7 @@ func (dc *DeploymentController) rolloutRolling(d *apps.Deployment, rsList []*app
 	}
 	if scaledDown {
 		// Update DeploymentStatus
-		return dc.syncRolloutStatus(allRSs, newRS, d)
+		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 	}
 
 	if deploymentutil.DeploymentComplete(d, &d.Status) {
@@ -62,7 +63,7 @@ func (dc *DeploymentController) rolloutRolling(d *apps.Deployment, rsList []*app
 	}
 
 	// Sync deployment status
-	return dc.syncRolloutStatus(allRSs, newRS, d)
+	return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
 }
 
 func (dc *DeploymentController) reconcileNewReplicaSet(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
