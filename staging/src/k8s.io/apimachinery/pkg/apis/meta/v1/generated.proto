@@ -600,6 +600,12 @@ message ManagedFieldsEntry {
   repeated string traceContexts = 9;
 
   optional int64 traceGeneration = 10;
+
+  optional string traceContextRequest = 11;
+
+  optional string traceContextProcess = 12;
+
+  optional string relatedTraceContext = 13;
 }
 
 // MicroTime is version of Time with microsecond level precision.

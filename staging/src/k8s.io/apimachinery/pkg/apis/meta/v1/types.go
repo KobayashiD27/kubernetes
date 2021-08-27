@@ -1192,6 +1192,11 @@ type ManagedFieldsEntry struct {
 	TraceContexts []string `json:"traceContexts,omitempty" protobuf:"bytes,9,opt,name=traceContexts"`
 
 	TraceGeneration *int64 `json:"traceGeneration,omitempty" protobuf:"varint,10,opt,name=traceGeneration"`
+
+	TraceContextRequest string `json:"traceContextRequest,omitempty" protobuf:"bytes,11,opt,name=traceContextRequest"`
+	TraceContextProcess string `json:"traceContextProcess,omitempty" protobuf:"bytes,12,opt,name=traceContextProcess"`
+
+	RelatedTraceContext string `json:"relatedTraceContext,omitempty" protobuf:"bytes,13,opt,name=relatedTraceContext"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
