@@ -44,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/traces"
+	"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -170,8 +171,33 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				if err != nil {
 					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
 				}
+				//obj = scope.FieldManager.UpdateNoErrors(ctx, liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				//admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+
+				// test mf update
+
+				xobj, _ := meta.Accessor(liveObj)
+				tidlr := map[string]string{}
+				for _, mf := range xobj.GetManagedFields() {
+					tidlr[mf.TraceContextRequest] = mf.TraceContextProcess
+				}
+
 				obj = scope.FieldManager.UpdateNoErrors(ctx, liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
 				admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+
+				xobj, _ = meta.Accessor(obj)
+				mfs := xobj.GetManagedFields()
+				relatedTIDString := traces.GetRelatedTraceContext(ctx)
+				klog.Infof("relatedTID %s", relatedTIDString)
+				for i, mf := range mfs {
+					mf.TraceContextProcess = tidlr[mf.TraceContextRequest]
+					if relatedTIDString != "" {
+						mf.RelatedTraceContext = relatedTIDString
+					}
+					mfs[i] = mf
+				}
+				xobj.SetManagedFields(mfs)
+				// end test
 			}
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {

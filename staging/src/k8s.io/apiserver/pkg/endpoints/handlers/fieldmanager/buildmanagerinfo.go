@@ -65,15 +65,21 @@ func (f *buildManagerInfoManager) Apply(ctx context.Context, liveObj, appliedObj
 
 func (f *buildManagerInfoManager) buildManagerInfo(ctx context.Context, prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
 	managerInfo := metav1.ManagedFieldsEntry{
-		Manager:         prefix,
-		Operation:       operation,
-		APIVersion:      f.groupVersion.String(),
-		Subresource:     f.subresource,
-		TraceContexts:   traces.ValueTraceContext(ctx),
-		TraceGeneration: new(int64),
+		Manager:             prefix,
+		Operation:           operation,
+		APIVersion:          f.groupVersion.String(),
+		Subresource:         f.subresource,
+		TraceContexts:       traces.ValueTraceContext(ctx),
+		TraceGeneration:     new(int64),
+		TraceContextRequest: traces.GetTraceContextRequest(ctx),
+		TraceContextProcess: "",
+		RelatedTraceContext: "",
 	}
 	if managerInfo.Manager == "" {
 		managerInfo.Manager = "unknown"
+	}
+	if managerInfo.Subresource == "status" {
+		managerInfo.TraceContextRequest = ""
 	}
 	return internal.BuildManagerIdentifier(&managerInfo)
 }

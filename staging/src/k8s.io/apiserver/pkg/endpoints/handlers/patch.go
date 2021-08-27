@@ -51,6 +51,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/traces"
+	"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -99,6 +100,8 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 		ctx = request.WithNamespace(ctx, namespace)
 		ctx = traces.WithTraceContext(ctx)
+		spc := traces.SpanContextFromContext(ctx)
+		ctx = traces.WithTraceContextRequest(ctx, spc.TraceID().String()+"-"+spc.SpanID().String())
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -325,8 +328,35 @@ func (p *jsonPatcher) applyPatchToCurrentObject(ctx context.Context, currentObje
 	}
 
 	if p.fieldManager != nil {
+		//traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
+		//objToUpdate = p.fieldManager.UpdateNoErrors(ctx, currentObject, objToUpdate, traceManager)
+
+		//test mf update
+
+		xobj, _ := meta.Accessor(currentObject)
+		tidlr := map[string]string{}
+		for _, mf := range xobj.GetManagedFields() {
+			tidlr[mf.TraceContextRequest] = mf.TraceContextProcess
+		}
+
 		traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
 		objToUpdate = p.fieldManager.UpdateNoErrors(ctx, currentObject, objToUpdate, traceManager)
+
+		relatedTIDString := traces.GetRelatedTraceContext(ctx)
+		klog.Infof("relatedTID %s", relatedTIDString)
+		xobj, _ = meta.Accessor(objToUpdate)
+		mfs := xobj.GetManagedFields()
+		for i, mf := range mfs {
+			mf.TraceContextProcess = tidlr[mf.TraceContextRequest]
+			if mf.RelatedTraceContext == "" {
+				mf.RelatedTraceContext = relatedTIDString
+			}
+			mfs[i] = mf
+		}
+		xobj.SetManagedFields(mfs)
+
+		//end mf update
+
 	}
 	return objToUpdate, nil
 }
@@ -409,8 +439,31 @@ func (p *smpPatcher) applyPatchToCurrentObject(ctx context.Context, currentObjec
 	}
 
 	if p.fieldManager != nil {
+		//traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
+		//newObj = p.fieldManager.UpdateNoErrors(ctx, currentObject, newObj, traceManager)
+		//test mf update
+
+		xobj, _ := meta.Accessor(currentObject)
+		tidlr := map[string]string{}
+		for _, mf := range xobj.GetManagedFields() {
+			tidlr[mf.TraceContextRequest] = mf.TraceContextProcess
+		}
+
 		traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
 		newObj = p.fieldManager.UpdateNoErrors(ctx, currentObject, newObj, traceManager)
+
+		relatedTIDString := traces.GetRelatedTraceContext(ctx) + "patch"
+		klog.Infof("relatedTID %s", relatedTIDString)
+		xobj, _ = meta.Accessor(newObj)
+		mfs := xobj.GetManagedFields()
+		for i, mf := range mfs {
+			mf.TraceContextProcess = tidlr[mf.TraceContextRequest]
+			if mf.RelatedTraceContext == "" {
+				mf.RelatedTraceContext = relatedTIDString
+			}
+			mfs[i] = mf
+		}
+		xobj.SetManagedFields(mfs)
 	}
 	return newObj, nil
 }
@@ -442,8 +495,34 @@ func (p *applyPatcher) applyPatchToCurrentObject(ctx context.Context, obj runtim
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
 
+	//traceManager := p.options.FieldManager
+	//return p.fieldManager.Apply(ctx, obj, patchObj, traceManager, force)
+
+	//test mf update
+
+	xobj, _ := meta.Accessor(obj)
+	tidlr := map[string]string{}
+	for _, mf := range xobj.GetManagedFields() {
+		tidlr[mf.TraceContextRequest] = mf.TraceContextProcess
+	}
+
 	traceManager := p.options.FieldManager
-	return p.fieldManager.Apply(ctx, obj, patchObj, traceManager, force)
+	obj, err := p.fieldManager.Apply(ctx, obj, patchObj, traceManager, force)
+
+	relatedTIDString := traces.GetRelatedTraceContext(ctx) + "patch"
+	klog.Infof("relatedTID %s", relatedTIDString)
+	xobj, _ = meta.Accessor(obj)
+	mfs := xobj.GetManagedFields()
+	for i, mf := range mfs {
+		mf.TraceContextProcess = tidlr[mf.TraceContextRequest]
+		if mf.RelatedTraceContext == "" {
+			mf.RelatedTraceContext = relatedTIDString
+		}
+		mfs[i] = mf
+	}
+	xobj.SetManagedFields(mfs)
+
+	return obj, err
 }
 
 func (p *applyPatcher) createNewObject(ctx context.Context) (runtime.Object, error) {
