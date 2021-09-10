@@ -174,6 +174,7 @@ const (
 	traceContextRequestKey     traceContextKey = "traceContextRequest"
 	relatedTraceContextKey     traceContextKey = "relatedTraceContext"
 	listRelatedTraceContextKey traceContextKey = "listRelatedTraceContext"
+	listUsedTraceContextKey    traceContextKey = "listUsedTraceContext"
 )
 
 func StartSpanFromContext(ctx context.Context) (context.Context, trace.Span) {
@@ -192,18 +193,22 @@ func StartSpan() (context.Context, trace.Span) {
 
 func UpdateTidList(ctx context.Context, meta metav1.Object, span trace.Span, text ...string) (context.Context, []metav1.ManagedFieldsEntry) {
 	klog.Infof("function:%s", text)
-	klog.Infof("request-check TID-Process/ span.TraceID-SpanID: %v-%v", span.SpanContext().TraceID(), span.SpanContext().SpanID())
 	var relatedTraceContexts []string
+	var usedTraceContexts string
 	managedFields := meta.GetManagedFields()
-	for i, mf := range managedFields {
-		if mf.TraceContextProcess == "" && mf.Subresource == "" {
-			mf.TraceContextProcess = span.SpanContext().TraceID().String() + "-" + span.SpanContext().SpanID().String()
-			managedFields[i] = mf
-			klog.Infof("Related TID-Request/TraceID-SpanID: %v", mf.TraceContextRequest)
-			relatedTraceContexts = append(relatedTraceContexts, mf.TraceContextRequest)
+	for _, mf := range managedFields {
+		if mf.Subresource == "" {
+			if mf.RelatedTraceContext != "" {
+				relatedTraceContexts = append(relatedTraceContexts, strings.Split(mf.RelatedTraceContext, "_")...)
+			} else {
+				relatedTraceContexts = append(relatedTraceContexts, mf.TraceContextRequest)
+			}
+			usedTraceContexts = usedTraceContexts + mf.TraceContextRequest + "_"
+
 		}
 	}
 	ctx = context.WithValue(ctx, string(listRelatedTraceContextKey), relatedTraceContexts)
+	ctx = baggage.ContextWithValues(ctx, attribute.String(string(listUsedTraceContextKey), usedTraceContexts))
 	return ctx, managedFields
 }
 
@@ -212,9 +217,25 @@ func GetListRelatedTraceContext(ctx context.Context) []string {
 	if !ok {
 		return nil
 	}
-	klog.Infof("Print RelatedTraceContexts:")
-	for _, str := range list {
-		klog.Infof("%v", str)
+	return list
+}
+func GetStringRelatedTraceContext(ctx context.Context) string {
+	list := GetListRelatedTraceContext(ctx)
+	res := ""
+	for _, tid := range list {
+		res = res + tid + "_"
+	}
+	return res
+}
+func GetStringUsedTraceContext(ctx context.Context) string {
+	return baggage.Value(ctx, attribute.Key(string(listUsedTraceContextKey))).AsString()
+}
+func GetListUsedTraceContext(ctx context.Context) []string {
+	trStr := GetStringUsedTraceContext(ctx)
+	trStrs := strings.Split(trStr, "_")
+	var list []string
+	for _, str := range trStrs {
+		list = append(list, str)
 	}
 	return list
 }
@@ -227,18 +248,17 @@ func StringTraceContext(ctx context.Context) string {
 
 	res := ""
 	for _, str := range traceContexts {
-		res = res + "-" + str
+		res = res + str + "_"
 	}
 	return res
 }
 
 func ParseRelatedTraceIDString(rtid string) []string {
-	rtids := strings.Split(rtid, "-")
+	rtids := strings.Split(rtid, "_")
 	var res []string
 	for _, id := range rtids {
 		res = append(res, id)
 	}
-	klog.Infof("rtids %s", res)
 	return res
 }
 
@@ -259,6 +279,18 @@ func GetTraceContextRequest(ctx context.Context) string {
 	return res
 }
 
+func DeleteUsedTraceIDs(ctx context.Context, mf metav1.ManagedFieldsEntry) metav1.ManagedFieldsEntry {
+	usedTraceIDList := GetListUsedTraceContext(ctx)
+	for _, used := range usedTraceIDList {
+		if used == mf.TraceContextRequest && used != "" {
+			mf.TraceContextRequest = ""
+			mf.TraceContextProcess = ""
+			mf.RelatedTraceContext = ""
+		}
+	}
+	return mf
+}
+
 func WithRelatedTraceContext(ctx context.Context, tcr string) context.Context {
 	return baggage.ContextWithValues(ctx, attribute.String(string(relatedTraceContextKey), tcr))
 }
@@ -272,23 +304,25 @@ func ContextWithSpan(ctx context.Context, span trace.Span) context.Context {
 	return trace.ContextWithSpan(ctx, span)
 }
 
-func MakeRelatedTraceContextBaggageValue(meta metav1.Object, span trace.Span) string {
+func MakeRelatedTraceContextBaggageValueOld(meta metav1.Object, span trace.Span) string {
 	val := ""
 	managedFields := meta.GetManagedFields()
 	for _, mf := range managedFields {
-		klog.Infof("Check tids, mf: %s, span: %s", mf.TraceContextProcess, span.SpanContext().TraceID().String()+"-"+span.SpanContext().SpanID().String())
 		if isSameTIDProcess(mf.TraceContextProcess, span) && mf.Subresource == "" {
-			val = val + mf.TraceContextRequest + "-"
+			if mf.RelatedTraceContext != "" {
+				val = val + mf.RelatedTraceContext
+			} else {
+				val = val + mf.TraceContextRequest + "_"
+			}
 		}
 	}
-	klog.Infof("BagValue : %s", val)
 	return val
 }
 
 func isSameTIDProcess(tcp string, span trace.Span) bool {
 
 	// parse tcp
-	tcpList := strings.Split(tcp, "-")
+	tcpList := strings.Split(tcp, "_")
 	tcpTraceID := tcpList[0]
 	return tcpTraceID == span.SpanContext().TraceID().String()
 }
