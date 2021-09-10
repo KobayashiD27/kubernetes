@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/component-base/traces"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -606,6 +607,15 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	translatedUID := m.podManager.TranslatePodUID(pod.UID)
+
+	//Test tracing
+	ctx, span := traces.StartSpan()
+	ctx, _ = traces.UpdateTidList(ctx, pod, span, "status_manager.go] syncPod")
+	defer func() {
+		klog.V(3).InfoS("Finished syncing pod", "pod", klog.KObj(pod), "traceContext", traces.GetListRelatedTraceContext(ctx))
+		span.End()
+	}()
+
 	// Type convert original uid just for the purpose of comparison.
 	if len(translatedUID) > 0 && translatedUID != kubetypes.ResolvedPodUID(uid) {
 		klog.V(2).InfoS("Pod was deleted and then recreated, skipping status update",
@@ -617,7 +627,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	oldStatus := pod.Status.DeepCopy()
-	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(m.kubeClient, pod.Namespace, pod.Name, pod.UID, *oldStatus, mergePodStatus(*oldStatus, status.status))
+	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(ctx, m.kubeClient, pod.Namespace, pod.Name, pod.UID, *oldStatus, mergePodStatus(*oldStatus, status.status))
 	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "patch", string(patchBytes))
 
 	if err != nil {

@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/traces"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -512,6 +513,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	if sched.skipPodSchedule(fwk, pod) {
 		return
 	}
+	_, span := traces.StartSpan()
+	ctx, _ = traces.UpdateTidList(ctx, pod, span, "shceduler.go] scheduleOne")
+	defer func() {
+		klog.InfoS("Finish ScheduleOne pod", "pod", klog.KObj(pod), "traceContext", traces.GetListRelatedTraceContext(ctx))
+	}()
 
 	klog.V(3).InfoS("Attempting to schedule pod", "pod", klog.KObj(pod))
 
