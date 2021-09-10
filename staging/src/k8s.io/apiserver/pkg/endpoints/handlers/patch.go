@@ -51,7 +51,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/traces"
-	"k8s.io/klog/v2"
+	//"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -342,15 +342,13 @@ func (p *jsonPatcher) applyPatchToCurrentObject(ctx context.Context, currentObje
 		traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
 		objToUpdate = p.fieldManager.UpdateNoErrors(ctx, currentObject, objToUpdate, traceManager)
 
-		relatedTIDString := traces.GetRelatedTraceContext(ctx)
-		klog.Infof("relatedTID %s", relatedTIDString)
 		xobj, _ = meta.Accessor(objToUpdate)
 		mfs := xobj.GetManagedFields()
 		for i, mf := range mfs {
 			mf.TraceContextProcess = tidlr[mf.TraceContextRequest]
-			if mf.RelatedTraceContext == "" {
-				mf.RelatedTraceContext = relatedTIDString
-			}
+			// Delete used TIDs
+			mf = traces.DeleteUsedTraceIDs(ctx, mf)
+
 			mfs[i] = mf
 		}
 		xobj.SetManagedFields(mfs)
@@ -452,8 +450,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(ctx context.Context, currentObjec
 		traceManager := managerOrUserAgent(p.options.FieldManager, p.userAgent)
 		newObj = p.fieldManager.UpdateNoErrors(ctx, currentObject, newObj, traceManager)
 
-		relatedTIDString := traces.GetRelatedTraceContext(ctx) + "patch"
-		klog.Infof("relatedTID %s", relatedTIDString)
+		relatedTIDString := traces.GetRelatedTraceContext(ctx)
 		xobj, _ = meta.Accessor(newObj)
 		mfs := xobj.GetManagedFields()
 		for i, mf := range mfs {
@@ -461,6 +458,9 @@ func (p *smpPatcher) applyPatchToCurrentObject(ctx context.Context, currentObjec
 			if mf.RelatedTraceContext == "" {
 				mf.RelatedTraceContext = relatedTIDString
 			}
+			// Delete used TIDs
+			mf = traces.DeleteUsedTraceIDs(ctx, mf)
+
 			mfs[i] = mf
 		}
 		xobj.SetManagedFields(mfs)
@@ -509,8 +509,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(ctx context.Context, obj runtim
 	traceManager := p.options.FieldManager
 	obj, err := p.fieldManager.Apply(ctx, obj, patchObj, traceManager, force)
 
-	relatedTIDString := traces.GetRelatedTraceContext(ctx) + "patch"
-	klog.Infof("relatedTID %s", relatedTIDString)
+	relatedTIDString := traces.GetRelatedTraceContext(ctx)
 	xobj, _ = meta.Accessor(obj)
 	mfs := xobj.GetManagedFields()
 	for i, mf := range mfs {
@@ -518,6 +517,8 @@ func (p *applyPatcher) applyPatchToCurrentObject(ctx context.Context, obj runtim
 		if mf.RelatedTraceContext == "" {
 			mf.RelatedTraceContext = relatedTIDString
 		}
+		// Delete used TIDs
+		mf = traces.DeleteUsedTraceIDs(ctx, mf)
 		mfs[i] = mf
 	}
 	xobj.SetManagedFields(mfs)

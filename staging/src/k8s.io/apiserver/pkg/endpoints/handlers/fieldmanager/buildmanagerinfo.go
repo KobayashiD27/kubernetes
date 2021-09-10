@@ -69,7 +69,7 @@ func (f *buildManagerInfoManager) buildManagerInfo(ctx context.Context, prefix s
 		Operation:           operation,
 		APIVersion:          f.groupVersion.String(),
 		Subresource:         f.subresource,
-		TraceContexts:       traces.ValueTraceContext(ctx),
+		TraceContexts:       "",
 		TraceGeneration:     new(int64),
 		TraceContextRequest: traces.GetTraceContextRequest(ctx),
 		TraceContextProcess: "",

@@ -42,7 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/traces"
-	"k8s.io/klog/v2"
+	//"k8s.io/klog/v2"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -147,7 +147,6 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 					xobj, _ := meta.Accessor(newObj)
 
-					klog.Infof("%s, TID: %s", xobj.GetName(), spc.TraceID().String()+"-"+spc.SpanID().String())
 					tidlr := map[string]string{}
 					for _, mf := range xobj.GetManagedFields() {
 						tidlr[mf.TraceContextRequest] = mf.TraceContextProcess
@@ -159,6 +158,9 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 					mfs := xobj.GetManagedFields()
 					for i, mf := range mfs {
 						mf.TraceContextProcess = tidlr[mf.TraceContextRequest]
+						// Delete Used TIDs
+						mf = traces.DeleteUsedTraceIDs(ctx, mf)
+
 						mfs[i] = mf
 					}
 					xobj.SetManagedFields(mfs)
