@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
+	"k8s.io/component-base/traces"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
@@ -46,6 +47,11 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 		reflect.DeepEqual(rs.Status.Conditions, newStatus.Conditions) {
 		return rs, nil
 	}
+
+	//Test mf
+	ctx, span := traces.StartSpan()
+	ctx, mf := traces.UpdateTidList(ctx, rs, span, "replicaset_utils.go] updateReplicasetStatus")
+	rs.SetManagedFields(mf)
 
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
 	// that we've seen a spec update when we retry.
@@ -64,7 +70,8 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, newStatus.ObservedGeneration))
 
 		rs.Status = newStatus
-		updatedRS, updateErr = c.UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{})
+		//updatedRS, updateErr = c.UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{})
+		updatedRS, updateErr = c.UpdateStatus(ctx, rs, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return updatedRS, nil
 		}

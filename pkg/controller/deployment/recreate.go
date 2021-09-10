@@ -36,7 +36,7 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 	activeOldRSs := controller.FilterActiveReplicaSets(oldRSs)
 
 	// scale down old replica sets.
-	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(activeOldRSs, d)
+	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(ctx, activeOldRSs, d)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 	}
 
 	// scale up new replica set.
-	if _, err := dc.scaleUpNewReplicaSetForRecreate(newRS, d); err != nil {
+	if _, err := dc.scaleUpNewReplicaSetForRecreate(ctx, newRS, d); err != nil {
 		return err
 	}
 
@@ -75,7 +75,7 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 }
 
 // scaleDownOldReplicaSetsForRecreate scales down old replica sets when deployment strategy is "Recreate".
-func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
+func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(ctx context.Context, oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
 	scaled := false
 	for i := range oldRSs {
 		rs := oldRSs[i]
@@ -83,7 +83,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*app
 		if *(rs.Spec.Replicas) == 0 {
 			continue
 		}
-		scaledRS, updatedRS, err := dc.scaleReplicaSetAndRecordEvent(rs, 0, deployment)
+		scaledRS, updatedRS, err := dc.scaleReplicaSetAndRecordEvent(ctx, rs, 0, deployment)
 		if err != nil {
 			return false, err
 		}
@@ -126,7 +126,7 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 }
 
 // scaleUpNewReplicaSetForRecreate scales up new replica set when deployment strategy is "Recreate".
-func (dc *DeploymentController) scaleUpNewReplicaSetForRecreate(newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
-	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(newRS, *(deployment.Spec.Replicas), deployment)
+func (dc *DeploymentController) scaleUpNewReplicaSetForRecreate(ctx context.Context, newRS *apps.ReplicaSet, deployment *apps.Deployment) (bool, error) {
+	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, newRS, *(deployment.Spec.Replicas), deployment)
 	return scaled, err
 }

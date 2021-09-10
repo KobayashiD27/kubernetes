@@ -543,13 +543,7 @@ func (rsc *ReplicaSetController) processNextWorkItem() bool {
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 // Does NOT modify <filteredPods>.
 // It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
-	ctx := traces.ManagedFieldsToContext(context.Background(), rs.ManagedFields, rs.Status.ObservedGeneration)
-	// test mf
-	_, span := traces.StartSpan()
-	ctx = traces.ContextWithSpan(ctx, span)
-	ctx, mfs := traces.UpdateTidList(ctx, rs, span, "replica_set.go@551] manageReplicas")
-	rs.SetManagedFields(mfs)
+func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
 
 	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
@@ -578,6 +572,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
+			ctx = traces.WithRelatedTraceContext(ctx, traces.GetStringRelatedTraceContext(ctx))
 			err := rsc.podControl.CreatePods(ctx, rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
 				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -657,10 +652,6 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 // invoked concurrently with the same key.
 func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing %v %q (%v)", rsc.Kind, key, time.Since(startTime))
-	}()
-
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
@@ -674,6 +665,13 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	if err != nil {
 		return err
 	}
+	//Test Tracing
+	ctx, span := traces.StartSpan()
+	ctx, _ = traces.UpdateTidList(ctx, rs, span, "replica_set.go@674] syncReplicaset")
+	defer func() {
+		klog.V(4).Infof("Finished syncing %v %q (%v), traceContext: %v", rsc.Kind, key, time.Since(startTime), traces.GetListRelatedTraceContext(ctx))
+		span.End()
+	}()
 
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
@@ -701,7 +699,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 
 	var manageReplicasErr error
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
-		manageReplicasErr = rsc.manageReplicas(filteredPods, rs)
+		manageReplicasErr = rsc.manageReplicas(ctx, filteredPods, rs)
 	}
 	rs = rs.DeepCopy()
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
@@ -723,12 +721,10 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 }
 
 func (rsc *ReplicaSetController) claimPods(rs *apps.ReplicaSet, selector labels.Selector, filteredPods []*v1.Pod) ([]*v1.Pod, error) {
-	ctx := traces.ManagedFieldsToContext(context.Background(), rs.ManagedFields, rs.Status.ObservedGeneration)
-
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(ctx, rs.Name, metav1.GetOptions{})
+		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

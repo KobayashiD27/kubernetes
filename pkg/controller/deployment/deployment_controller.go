@@ -575,9 +575,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	startTime := time.Now()
 	klog.V(4).InfoS("Started syncing deployment", "deployment", klog.KRef(namespace, name), "startTime", startTime)
-	defer func() {
-		klog.V(4).InfoS("Finished syncing deployment", "deployment", klog.KRef(namespace, name), "duration", time.Since(startTime))
-	}()
 
 	deployment, err := dc.dLister.Deployments(namespace).Get(name)
 	if errors.IsNotFound(err) {
@@ -591,15 +588,14 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
 	d := deployment.DeepCopy()
-	ctx := traces.ManagedFieldsToContext(context.Background(), d.ManagedFields, d.Status.ObservedGeneration)
 
 	//Test Tracing
-	currCtx, span := traces.StartSpan()
-	defer span.End()
-	ctx = traces.ContextWithSpan(ctx, span)
-	klog.Infof("Test Tracing, TraceID, SpanID: %s, %s", span.SpanContext().TraceID(), span.SpanContext().SpanID())
-	currCtx, mfs := traces.UpdateTidList(currCtx, d, span, "syncDeploynemt @deployment_controller.go")
-	d.SetManagedFields(mfs)
+	ctx, span := traces.StartSpan()
+	ctx, _ = traces.UpdateTidList(ctx, d, span, "syncDeploynemt @deployment_controller.go")
+	defer func() {
+		klog.V(4).InfoS("Finished syncing deployment", "deployment", klog.KRef(namespace, name), "duration", time.Since(startTime), "traceContext", traces.GetListRelatedTraceContext(ctx))
+		span.End()
+	}()
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
@@ -628,40 +624,40 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	if d.DeletionTimestamp != nil {
-		return dc.syncStatusOnly(currCtx, d, rsList)
+		return dc.syncStatusOnly(ctx, d, rsList)
 	}
 
 	// Update deployment conditions with an Unknown condition when pausing/resuming
 	// a deployment. In this way, we can be sure that we won't timeout when a user
 	// resumes a Deployment with a set progressDeadlineSeconds.
-	if err = dc.checkPausedConditions(currCtx, d); err != nil {
+	if err = dc.checkPausedConditions(ctx, d); err != nil {
 		return err
 	}
 
 	if d.Spec.Paused {
-		return dc.sync(currCtx, d, rsList)
+		return dc.sync(ctx, d, rsList)
 	}
 
 	// rollback is not re-entrant in case the underlying replica sets are updated with a new
 	// revision so we should ensure that we won't proceed to update replica sets until we
 	// make sure that the deployment has cleaned up its rollback spec in subsequent enqueues.
 	if getRollbackTo(d) != nil {
-		return dc.rollback(currCtx, d, rsList)
+		return dc.rollback(ctx, d, rsList)
 	}
 
-	scalingEvent, err := dc.isScalingEvent(currCtx, d, rsList)
+	scalingEvent, err := dc.isScalingEvent(ctx, d, rsList)
 	if err != nil {
 		return err
 	}
 	if scalingEvent {
-		return dc.sync(currCtx, d, rsList)
+		return dc.sync(ctx, d, rsList)
 	}
 
 	switch d.Spec.Strategy.Type {
 	case apps.RecreateDeploymentStrategyType:
-		return dc.rolloutRecreate(currCtx, d, rsList, podMap)
+		return dc.rolloutRecreate(ctx, d, rsList, podMap)
 	case apps.RollingUpdateDeploymentStrategyType:
-		return dc.rolloutRolling(currCtx, d, rsList)
+		return dc.rolloutRolling(ctx, d, rsList)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }
