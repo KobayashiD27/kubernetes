@@ -26,12 +26,13 @@ import (
 // AllocatedDeviceStatusApplyConfiguration represents a declarative configuration of the AllocatedDeviceStatus type for use
 // with apply.
 type AllocatedDeviceStatusApplyConfiguration struct {
-	Driver      *string                              `json:"driver,omitempty"`
-	Pool        *string                              `json:"pool,omitempty"`
-	Device      *string                              `json:"device,omitempty"`
-	Conditions  []v1.ConditionApplyConfiguration     `json:"conditions,omitempty"`
-	Data        *runtime.RawExtension                `json:"data,omitempty"`
-	NetworkData *NetworkDeviceDataApplyConfiguration `json:"networkData,omitempty"`
+	Driver         *string                              `json:"driver,omitempty"`
+	Pool           *string                              `json:"pool,omitempty"`
+	Device         *string                              `json:"device,omitempty"`
+	Conditions     []v1.ConditionApplyConfiguration     `json:"conditions,omitempty"`
+	Data           *runtime.RawExtension                `json:"data,omitempty"`
+	NetworkData    *NetworkDeviceDataApplyConfiguration `json:"networkData,omitempty"`
+	FabricAttached *string                              `json:"fabricAttached,omitempty"`
 }
 
 // AllocatedDeviceStatusApplyConfiguration constructs a declarative configuration of the AllocatedDeviceStatus type for use with
@@ -90,5 +91,13 @@ func (b *AllocatedDeviceStatusApplyConfiguration) WithData(value runtime.RawExte
 // If called multiple times, the NetworkData field is set to the value of the last call.
 func (b *AllocatedDeviceStatusApplyConfiguration) WithNetworkData(value *NetworkDeviceDataApplyConfiguration) *AllocatedDeviceStatusApplyConfiguration {
 	b.NetworkData = value
+	return b
+}
+
+// WithFabricAttached sets the FabricAttached field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FabricAttached field is set to the value of the last call.
+func (b *AllocatedDeviceStatusApplyConfiguration) WithFabricAttached(value string) *AllocatedDeviceStatusApplyConfiguration {
+	b.FabricAttached = &value
 	return b
 }

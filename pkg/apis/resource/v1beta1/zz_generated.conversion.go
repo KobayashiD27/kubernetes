@@ -391,6 +391,7 @@ func autoConvert_v1beta1_AllocatedDeviceStatus_To_resource_AllocatedDeviceStatus
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resource.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.FabricAttached = in.FabricAttached
 	return nil
 }
 
@@ -406,6 +407,7 @@ func autoConvert_resource_AllocatedDeviceStatus_To_v1beta1_AllocatedDeviceStatus
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resourcev1beta1.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.FabricAttached = in.FabricAttached
 	return nil
 }
 
@@ -485,6 +487,7 @@ func Convert_resource_CELDeviceSelector_To_v1beta1_CELDeviceSelector(in *resourc
 func autoConvert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *resource.Device, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Basic = (*resource.BasicDevice)(unsafe.Pointer(in.Basic))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 
@@ -496,6 +499,7 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 func autoConvert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourcev1beta1.Device, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Basic = (*resourcev1beta1.BasicDevice)(unsafe.Pointer(in.Basic))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 
@@ -822,6 +826,7 @@ func autoConvert_v1beta1_DeviceRequestAllocationResult_To_resource_DeviceRequest
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 
@@ -836,6 +841,7 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1beta1_DeviceRequest
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 

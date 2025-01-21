@@ -147,6 +147,7 @@ func autoConvert_api_Device_To_v1beta1_Device(in *Device, out *v1beta1.Device, s
 		return err
 	}
 	out.Basic = (*v1beta1.BasicDevice)(unsafe.Pointer(in.Basic))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 
@@ -160,6 +161,7 @@ func autoConvert_v1beta1_Device_To_api_Device(in *v1beta1.Device, out *Device, s
 		return err
 	}
 	out.Basic = (*BasicDevice)(unsafe.Pointer(in.Basic))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 

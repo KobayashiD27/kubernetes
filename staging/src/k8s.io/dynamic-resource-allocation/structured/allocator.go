@@ -314,11 +314,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		allocationResult.Devices.Results = make([]resourceapi.DeviceRequestAllocationResult, len(internalResult.devices))
 		for i, internal := range internalResult.devices {
 			allocationResult.Devices.Results[i] = resourceapi.DeviceRequestAllocationResult{
-				Request:     internal.request,
-				Driver:      internal.id.Driver.String(),
-				Pool:        internal.id.Pool.String(),
-				Device:      internal.id.Device.String(),
-				AdminAccess: internal.adminAccess,
+				Request:        internal.request,
+				Driver:         internal.id.Driver.String(),
+				Pool:           internal.id.Pool.String(),
+				Device:         internal.id.Device.String(),
+				AdminAccess:    internal.adminAccess,
+				WaitForPrepare: internal.waitForPrepare,
 			}
 		}
 
@@ -399,9 +400,10 @@ type requestData struct {
 }
 
 type deviceWithID struct {
-	id    DeviceID
-	basic *draapi.BasicDevice
-	slice *draapi.ResourceSlice
+	id             DeviceID
+	basic          *draapi.BasicDevice
+	slice          *draapi.ResourceSlice
+	waitForPrepare bool
 }
 
 type internalAllocationResult struct {
@@ -409,10 +411,11 @@ type internalAllocationResult struct {
 }
 
 type internalDeviceResult struct {
-	request     string
-	id          DeviceID
-	slice       *draapi.ResourceSlice
-	adminAccess *bool
+	request        string
+	id             DeviceID
+	slice          *draapi.ResourceSlice
+	adminAccess    *bool
+	waitForPrepare bool
 }
 
 type constraint interface {
@@ -619,9 +622,10 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 
 				// Finally treat as allocated and move on to the next device.
 				device := deviceWithID{
-					id:    deviceID,
-					basic: slice.Spec.Devices[deviceIndex].Basic,
-					slice: slice,
+					id:             deviceID,
+					basic:          slice.Spec.Devices[deviceIndex].Basic,
+					slice:          slice,
+					waitForPrepare: slice.Spec.Devices[deviceIndex].WaitForPrepare,
 				}
 				allocated, deallocate, err := alloc.allocateDevice(r, device, false)
 				if err != nil {
@@ -780,9 +784,10 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		alloc.allocatingDevices[device.id] = true
 	}
 	result := internalDeviceResult{
-		request: request.Name,
-		id:      device.id,
-		slice:   device.slice,
+		request:        request.Name,
+		id:             device.id,
+		slice:          device.slice,
+		waitForPrepare: device.waitForPrepare,
 	}
 	if adminAccess {
 		result.adminAccess = &adminAccess

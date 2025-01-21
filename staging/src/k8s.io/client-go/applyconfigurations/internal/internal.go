@@ -12376,6 +12376,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: fabricAttached
+      type:
+        scalar: string
     - name: networkData
       type:
         namedType: io.k8s.api.resource.v1alpha3.NetworkDeviceData
@@ -12423,6 +12426,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: waitForPrepare
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1alpha3.DeviceAllocationConfiguration
   map:
     fields:
@@ -12600,6 +12606,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: waitForPrepare
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1alpha3.DeviceSelector
   map:
     fields:
@@ -12809,6 +12818,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: fabricAttached
+      type:
+        scalar: string
     - name: networkData
       type:
         namedType: io.k8s.api.resource.v1beta1.NetworkDeviceData
@@ -12856,6 +12868,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: waitForPrepare
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1beta1.DeviceAllocationConfiguration
   map:
     fields:
@@ -13039,6 +13054,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: waitForPrepare
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1beta1.DeviceSelector
   map:
     fields:

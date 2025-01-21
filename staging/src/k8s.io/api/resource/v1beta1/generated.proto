@@ -78,6 +78,11 @@ message AllocatedDeviceStatus {
   //
   // +optional
   optional NetworkDeviceData networkData = 6;
+
+  // FabricAttached contains information about the fabric to which the device is attached.
+  //
+  // +optional
+  optional string fabricAttached = 7;
 }
 
 // AllocationResult contains attributes of an allocated resource.
@@ -184,6 +189,14 @@ message Device {
   // +optional
   // +oneOf=deviceType
   optional BasicDevice basic = 2;
+
+  // WaitForPrepare indicates that the driver is not ready to serve
+  // this device yet. The device will be allocated only after the driver
+  // has prepared it. This is useful for devices which need to be
+  // initialized before they can be used.
+  //
+  // +optional
+  optional bool waitForPrepare = 3;
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -527,6 +540,14 @@ message DeviceRequestAllocationResult {
   // +optional
   // +featureGate=DRAAdminAccess
   optional bool adminAccess = 5;
+
+  // WaitForPrepare indicates that the driver is not ready to serve
+  // this device yet. The device will be allocated only after the driver
+  // has prepared it. This is useful for devices which need to be
+  // initialized before they can be used.
+  //
+  // +optional
+  optional bool waitForPrepare = 6;
 }
 
 // DeviceSelector must have exactly one field set.

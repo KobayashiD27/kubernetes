@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -787,6 +789,69 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 			state.claims[index] = claim
 		}
 	}
+
+	// We need to check if the device is attached to the node.
+	needPrepare := false
+	for _, claim := range state.claims {
+		for _, device := range claim.Status.Devices {
+			if device.FabricAttached == "NotAttached" || device.FabricAttached == "Failed" {
+				logger.Info("device not attached ", "claim", klog.KObj(claim), "device", device.Device)
+				needPrepare = true
+				break
+			}
+		}
+	}
+
+	// If no device needs to be prepared, we can return early.
+	if !needPrepare {
+		return nil
+	}
+
+	// We need to wait for the device to be attached to the node.
+	deviceWaitBackoff := wait.Backoff{
+		Steps:    3,
+		Duration: 10 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.1,
+	}
+	// Custom error to indicate a failed device
+	var errDeviceFailed = errors.New("device failed to attach")
+
+	// If needed we wait for the device to be attached to the node.
+	err = retry.OnError(deviceWaitBackoff,
+		func(err error) bool {
+			return err != nil && err != errDeviceFailed
+		}, func() error {
+			for claimIndex, claim := range state.claims {
+				updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				state.claims[claimIndex] = updatedClaim
+				for _, device := range updatedClaim.Status.Devices {
+					if device.FabricAttached == "NotAttached" {
+						return fmt.Errorf("device %s is not attached", device.Device)
+					} else if device.FabricAttached == "Failed" {
+						klog.Info("device failed to attach", "claim", klog.KObj(updatedClaim))
+						updatedClaim.Status.Allocation = nil
+						updatedClaim.Status.Devices = nil
+						updatedClaim.Status.ReservedFor = nil
+						updatedClaim, err = pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, updatedClaim, metav1.UpdateOptions{})
+						if err != nil {
+							logger.Error(err, "failed to update claim status", "claim", klog.KObj(updatedClaim))
+							return err
+						}
+						state.claims[claimIndex] = updatedClaim
+						return errDeviceFailed
+					}
+					logger.Info("device attached", "claim", klog.KObj(updatedClaim))
+				}
+			}
+			return nil
+		})
+	if err != nil {
+		return statusError(logger, err)
+	}
 	// If we get here, we know that reserving the claim for
 	// the pod worked and we can proceed with binding it.
 	return nil
@@ -860,6 +925,30 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
+
+		// FabricAttached is set to "NotAttached" if WaitForPrepare is true.
+		for _, device := range claim.Status.Allocation.Devices.Results {
+			if device.WaitForPrepare {
+				if claim.Status.Devices == nil {
+					ds := resourceapi.AllocatedDeviceStatus{
+						Device:         device.Device,
+						Driver:         device.Driver,
+						Pool:           device.Pool,
+						FabricAttached: "NotAttached",
+					}
+					claim.Status.Devices = append(claim.Status.Devices, ds)
+					continue
+				}
+				for deviceIndex, devicePath := range claim.Status.Devices {
+					klog.Info("devicePath", devicePath, "device", device)
+					if devicePath.Device == device.Device && devicePath.Driver == device.Driver && devicePath.Pool == device.Pool {
+						if claim.Status.Devices[deviceIndex].FabricAttached != "Attached" {
+							break
+						}
+					}
+				}
+			}
+		}
 		updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			if allocation != nil {

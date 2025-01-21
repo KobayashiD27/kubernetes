@@ -200,6 +200,14 @@ type Device struct {
 	// +optional
 	// +oneOf=deviceType
 	Basic *BasicDevice `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
+
+	// WaitForPrepare indicates that the driver is not ready to serve
+	// this device yet. The device will be allocated only after the driver
+	// has prepared it. This is useful for devices which need to be
+	// initialized before they can be used.
+	//
+	// +optional
+	WaitForPrepare bool `json:"waitForPrepare,omitempty" protobuf:"bytes,3,opt,name=waitForPrepare"`
 }
 
 // BasicDevice defines one device instance.
@@ -828,6 +836,14 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
+
+	// WaitForPrepare indicates that the driver is not ready to serve
+	// this device yet. The device will be allocated only after the driver
+	// has prepared it. This is useful for devices which need to be
+	// initialized before they can be used.
+	//
+	// +optional
+	WaitForPrepare bool `json:"waitForPrepare,omitempty" protobuf:"bytes,6,opt,name=waitForPrepare"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1047,6 +1063,11 @@ type AllocatedDeviceStatus struct {
 	//
 	// +optional
 	NetworkData *NetworkDeviceData `json:"networkData,omitempty" protobuf:"bytes,6,opt,name=networkData"`
+
+	// FabricAttached indicates whether the device is attached to a fabric.
+	//
+	// +optional
+	FabricAttached string `json:"fabricAttached,omitempty" protobuf:"bytes,7,opt,name=fabricAttached"`
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.

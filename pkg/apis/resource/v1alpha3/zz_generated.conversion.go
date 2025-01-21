@@ -392,6 +392,7 @@ func autoConvert_v1alpha3_AllocatedDeviceStatus_To_resource_AllocatedDeviceStatu
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resource.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.FabricAttached = in.FabricAttached
 	return nil
 }
 
@@ -407,6 +408,7 @@ func autoConvert_resource_AllocatedDeviceStatus_To_v1alpha3_AllocatedDeviceStatu
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resourcev1alpha3.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.FabricAttached = in.FabricAttached
 	return nil
 }
 
@@ -518,6 +520,7 @@ func autoConvert_v1alpha3_Device_To_resource_Device(in *resourcev1alpha3.Device,
 	} else {
 		out.Basic = nil
 	}
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 
@@ -537,6 +540,7 @@ func autoConvert_resource_Device_To_v1alpha3_Device(in *resource.Device, out *re
 	} else {
 		out.Basic = nil
 	}
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 
@@ -843,6 +847,7 @@ func autoConvert_v1alpha3_DeviceRequestAllocationResult_To_resource_DeviceReques
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 
@@ -857,6 +862,7 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1alpha3_DeviceReques
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.WaitForPrepare = in.WaitForPrepare
 	return nil
 }
 

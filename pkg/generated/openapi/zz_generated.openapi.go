@@ -46368,6 +46368,13 @@ func schema_k8sio_api_resource_v1alpha3_AllocatedDeviceStatus(ref common.Referen
 							Ref:         ref("k8s.io/api/resource/v1alpha3.NetworkDeviceData"),
 						},
 					},
+					"fabricAttached": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FabricAttached indicates whether the device is attached to a fabric.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"driver", "pool", "device"},
 			},
@@ -46490,6 +46497,13 @@ func schema_k8sio_api_resource_v1alpha3_Device(ref common.ReferenceCallback) com
 						SchemaProps: spec.SchemaProps{
 							Description: "Basic defines one device instance.",
 							Ref:         ref("k8s.io/api/resource/v1alpha3.BasicDevice"),
+						},
+					},
+					"waitForPrepare": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WaitForPrepare indicates that the driver is not ready to serve this device yet. The device will be allocated only after the driver has prepared it. This is useful for devices which need to be initialized before they can be used.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},
@@ -47102,6 +47116,13 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 					"adminAccess": {
 						SchemaProps: spec.SchemaProps{
 							Description: "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"waitForPrepare": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WaitForPrepare indicates that the driver is not ready to serve this device yet. The device will be allocated only after the driver has prepared it. This is useful for devices which need to be initialized before they can be used.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -47842,6 +47863,13 @@ func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.Referenc
 							Ref:         ref("k8s.io/api/resource/v1beta1.NetworkDeviceData"),
 						},
 					},
+					"fabricAttached": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FabricAttached contains information about the fabric to which the device is attached.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"driver", "pool", "device"},
 			},
@@ -47965,6 +47993,13 @@ func schema_k8sio_api_resource_v1beta1_Device(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "Basic defines one device instance.",
 							Ref:         ref("k8s.io/api/resource/v1beta1.BasicDevice"),
+						},
+					},
+					"waitForPrepare": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WaitForPrepare indicates that the driver is not ready to serve this device yet. The device will be allocated only after the driver has prepared it. This is useful for devices which need to be initialized before they can be used.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},
@@ -48599,6 +48634,13 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 					"adminAccess": {
 						SchemaProps: spec.SchemaProps{
 							Description: "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"waitForPrepare": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WaitForPrepare indicates that the driver is not ready to serve this device yet. The device will be allocated only after the driver has prepared it. This is useful for devices which need to be initialized before they can be used.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

@@ -43,8 +43,9 @@ type ResourcePool struct {
 	ResourceSliceCount int64
 }
 type Device struct {
-	Name  UniqueString
-	Basic *BasicDevice
+	Name           UniqueString
+	Basic          *BasicDevice
+	WaitForPrepare bool
 }
 
 type BasicDevice struct {

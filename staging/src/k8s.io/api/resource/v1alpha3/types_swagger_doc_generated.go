@@ -28,13 +28,14 @@ package v1alpha3
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AllocatedDeviceStatus = map[string]string{
-	"":            "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
-	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
-	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
-	"conditions":  "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
-	"data":        "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
-	"networkData": "NetworkData contains network-related information specific to the device.",
+	"":               "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
+	"driver":         "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"pool":           "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
+	"device":         "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+	"conditions":     "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
+	"data":           "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+	"networkData":    "NetworkData contains network-related information specific to the device.",
+	"fabricAttached": "FabricAttached indicates whether the device is attached to a fabric.",
 }
 
 func (AllocatedDeviceStatus) SwaggerDoc() map[string]string {
@@ -71,9 +72,10 @@ func (CELDeviceSelector) SwaggerDoc() map[string]string {
 }
 
 var map_Device = map[string]string{
-	"":      "Device represents one individual hardware instance that can be selected based on its attributes. Besides the name, exactly one field must be set.",
-	"name":  "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
-	"basic": "Basic defines one device instance.",
+	"":               "Device represents one individual hardware instance that can be selected based on its attributes. Besides the name, exactly one field must be set.",
+	"name":           "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
+	"basic":          "Basic defines one device instance.",
+	"waitForPrepare": "WaitForPrepare indicates that the driver is not ready to serve this device yet. The device will be allocated only after the driver has prepared it. This is useful for devices which need to be initialized before they can be used.",
 }
 
 func (Device) SwaggerDoc() map[string]string {
@@ -204,12 +206,13 @@ func (DeviceRequest) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceRequestAllocationResult = map[string]string{
-	"":            "DeviceRequestAllocationResult contains the allocation result for one request.",
-	"request":     "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
-	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
-	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
-	"adminAccess": "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+	"":               "DeviceRequestAllocationResult contains the allocation result for one request.",
+	"request":        "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+	"driver":         "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"pool":           "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
+	"device":         "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+	"adminAccess":    "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+	"waitForPrepare": "WaitForPrepare indicates that the driver is not ready to serve this device yet. The device will be allocated only after the driver has prepared it. This is useful for devices which need to be initialized before they can be used.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {
