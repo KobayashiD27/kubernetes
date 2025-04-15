@@ -47284,11 +47284,17 @@ func schema_k8sio_api_resource_v1alpha3_AllocationResult(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
+					"bindingStartTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingStartTime is the time when the binding was started. This is used to determine whether the allocation timed out. It is set by the scheduler when it starts allocating the claim.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAllocationResult"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAllocationResult", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -49469,11 +49475,17 @@ func schema_k8sio_api_resource_v1beta1_AllocationResult(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
+					"bindingStartTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingStartTime is the time when the binding was started. This is used to determine whether the allocation timed out. It is set by the scheduler when it starts allocating the claim.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.DeviceAllocationResult"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.DeviceAllocationResult", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -51491,11 +51503,17 @@ func schema_k8sio_api_resource_v1beta2_AllocationResult(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
+					"bindingStartTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingStartTime is the time when the binding was started. This is used to determine whether the allocation timed out. It is set by the scheduler when it starts allocating the claim.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.DeviceAllocationResult"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.DeviceAllocationResult", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 

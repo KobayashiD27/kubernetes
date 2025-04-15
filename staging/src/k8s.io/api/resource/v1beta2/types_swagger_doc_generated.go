@@ -42,9 +42,10 @@ func (AllocatedDeviceStatus) SwaggerDoc() map[string]string {
 }
 
 var map_AllocationResult = map[string]string{
-	"":             "AllocationResult contains attributes of an allocated resource.",
-	"devices":      "Devices is the result of allocating devices.",
-	"nodeSelector": "NodeSelector defines where the allocated resources are available. If unset, they are available everywhere.",
+	"":                 "AllocationResult contains attributes of an allocated resource.",
+	"devices":          "Devices is the result of allocating devices.",
+	"nodeSelector":     "NodeSelector defines where the allocated resources are available. If unset, they are available everywhere.",
+	"bindingStartTime": "BindingStartTime is the time when the binding was started. This is used to determine whether the allocation timed out. It is set by the scheduler when it starts allocating the claim.",
 }
 
 func (AllocationResult) SwaggerDoc() map[string]string {

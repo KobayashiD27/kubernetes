@@ -69,6 +69,10 @@ func (in *AllocationResult) DeepCopyInto(out *AllocationResult) {
 		*out = new(corev1.NodeSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.BindingStartTime != nil {
+		in, out := &in.BindingStartTime, &out.BindingStartTime
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 
