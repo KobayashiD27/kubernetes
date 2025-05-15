@@ -171,6 +171,17 @@ const (
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
 
+	// owner: @KobayashiD27
+	// kep: http://kep.k8s.io/5007
+	// alpha: v1.33
+	//
+	// Enables support for delaying the binding of pods
+	// which depend on devices with binding conditions.
+	//
+	// DRAResourceClaimDeviceStatus also needs to be
+	// enabled.
+	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/5055
 	//
@@ -271,17 +282,6 @@ const (
 	// that is independent of a Pod. Resource allocation is done by the scheduler
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
-
-	// owner: @KobayashiD27
-	// kep: http://kep.k8s.io/5007
-	// alpha: v1.33
-	//
-	// Enables support for delaying the binding of pods
-	// which depend on devices with binding conditions.
-	//
-	// DRAResourceClaimDeviceStatus also needs to be
-	// enabled.
-	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
 
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
@@ -1103,6 +1103,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRADeviceBindingConditions: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRADeviceTaints: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -1118,10 +1122,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	DRAResourceClaimDeviceStatus: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	DRADeviceBindingConditions: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DeclarativeValidation: {
