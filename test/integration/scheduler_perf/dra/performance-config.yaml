@@ -641,6 +641,7 @@
   featureGates:
     DynamicResourceAllocation: true
     DRADeviceBindingConditions: true
+    SchedulerQueueingHints: true
     DRAResourceClaimDeviceStatus: true
   workloadTemplate:
     - opcode: createNodes

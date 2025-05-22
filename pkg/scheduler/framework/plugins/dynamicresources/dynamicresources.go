@@ -996,7 +996,7 @@ func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim) (bool
 // It returns true if the binding timeout is reached.
 // It returns false if the binding timeout is not reached.
 func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) bool {
-	if !pl.enableDeviceBindingConditions && !pl.enableDeviceStatus {
+	if !pl.enableDeviceBindingConditions || !pl.enableDeviceStatus {
 		return false
 	}
 	if claim.Status.Allocation == nil || claim.Status.Allocation.AllocationTimestamp == nil {
@@ -1004,10 +1004,11 @@ func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) boo
 	}
 	// check if the binding timeout is reached
 	for _, deviceRequest := range claim.Status.Allocation.Devices.Results {
-		if deviceRequest.BindingTimeoutSeconds == nil {
+		if deviceRequest.BindingConditions == nil {
 			continue
 		}
-		if claim.Status.Allocation.AllocationTimestamp.Add(time.Duration(ptr.Deref(deviceRequest.BindingTimeoutSeconds, 0)) * time.Second).Before(time.Now()) {
+		timeoutSeconds := ptr.Deref(deviceRequest.BindingTimeoutSeconds, 600) // default to 10 minutes
+		if claim.Status.Allocation.AllocationTimestamp.Add(time.Duration(timeoutSeconds) * time.Second).Before(time.Now()) {
 			return true
 		}
 	}
